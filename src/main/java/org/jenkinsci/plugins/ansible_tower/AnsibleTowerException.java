@@ -1,4 +1,4 @@
-package jenkins.plugins.ansible_tower;
+package org.jenkinsci.plugins.ansible_tower;
 
 public class AnsibleTowerException extends Exception {
     public AnsibleTowerException(String message) {

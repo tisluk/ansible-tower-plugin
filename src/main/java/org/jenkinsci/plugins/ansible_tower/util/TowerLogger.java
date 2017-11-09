@@ -1,4 +1,4 @@
-package jenkins.plugins.ansible_tower.util;
+package org.jenkinsci.plugins.ansible_tower.util;
 
 public class TowerLogger {
     private boolean debugging = false;

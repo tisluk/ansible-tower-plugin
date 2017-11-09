@@ -1,9 +1,9 @@
-package jenkins.plugins.ansible_tower;
+package org.jenkinsci.plugins.ansible_tower;
 
 import hudson.model.AbstractBuild;
 import hudson.model.Result;
-import jenkins.plugins.ansible_tower.util.TowerConnector;
-import jenkins.plugins.ansible_tower.util.TowerInstallation;
+import org.jenkinsci.plugins.ansible_tower.util.TowerConnector;
+import org.jenkinsci.plugins.ansible_tower.util.TowerInstallation;
 
 import java.io.PrintStream;
 

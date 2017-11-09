@@ -1,4 +1,4 @@
-package jenkins.plugins.ansible_tower.util;
+package org.jenkinsci.plugins.ansible_tower.util;
 
 import static com.cloudbees.plugins.credentials.CredentialsMatchers.instanceOf;
 import com.cloudbees.plugins.credentials.common.StandardListBoxModel;

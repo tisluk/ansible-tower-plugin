@@ -1,4 +1,4 @@
-package jenkins.plugins.ansible_tower;
+package org.jenkinsci.plugins.ansible_tower;
 
 import com.google.inject.Inject;
 import hudson.Launcher;
@@ -8,7 +8,7 @@ import hudson.model.TaskListener;
 import hudson.*;
 import hudson.util.ListBoxModel;
 import jenkins.model.Jenkins;
-import jenkins.plugins.ansible_tower.util.TowerInstallation;
+import org.jenkinsci.plugins.ansible_tower.util.TowerInstallation;
 import org.jenkinsci.plugins.workflow.steps.AbstractStepImpl;
 import org.jenkinsci.plugins.workflow.steps.AbstractSynchronousNonBlockingStepExecution;
 import org.jenkinsci.plugins.workflow.steps.StepContextParameter;

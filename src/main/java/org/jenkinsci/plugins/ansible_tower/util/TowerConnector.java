@@ -1,7 +1,7 @@
-package jenkins.plugins.ansible_tower.util;
+package org.jenkinsci.plugins.ansible_tower.util;
 
 import com.google.common.net.HttpHeaders;
-import jenkins.plugins.ansible_tower.AnsibleTowerException;
+import org.jenkinsci.plugins.ansible_tower.AnsibleTowerException;
 
 import java.io.IOException;
 import java.io.PrintStream;

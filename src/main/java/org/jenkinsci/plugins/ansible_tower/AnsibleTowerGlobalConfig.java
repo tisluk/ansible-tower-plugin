@@ -1,4 +1,4 @@
-package jenkins.plugins.ansible_tower;
+package org.jenkinsci.plugins.ansible_tower;
 
 import hudson.Extension;
 import hudson.XmlFile;
@@ -12,7 +12,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
-import jenkins.plugins.ansible_tower.util.TowerInstallation;
+import org.jenkinsci.plugins.ansible_tower.util.TowerInstallation;
 
 @Extension
 public class AnsibleTowerGlobalConfig extends GlobalConfiguration {
@@ -30,7 +30,7 @@ public class AnsibleTowerGlobalConfig extends GlobalConfiguration {
         Jenkins j = Jenkins.getInstance();
         if (j == null) return null;
         File rootDir = j.getRootDir();
-        File xmlFile = new File(rootDir, "jenkins.plugins.ansible_tower.AnsibleTower.xml");
+        File xmlFile = new File(rootDir, "org.jenkinsci.plugins.ansible_tower.AnsibleTower.xml");
         return new XmlFile(XSTREAM2, xmlFile);
     }
 
