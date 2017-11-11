@@ -41,7 +41,6 @@ public class TowerConnector {
     private String username = null;
     private String password = null;
     private boolean trustAllCerts = true;
-    private boolean debug = false;
     private TowerLogger logger = new TowerLogger();
     private Vector<Integer> displayedEvents = new Vector<Integer>();
 
@@ -61,7 +60,6 @@ public class TowerConnector {
     }
 
     public void setDebug(boolean debug) {
-        this.debug = debug;
         logger.setDebugging(debug);
     }
 
@@ -131,8 +129,8 @@ public class TowerConnector {
         if(this.username != null || this.password != null) {
             logger.logMessage("Adding auth for "+ this.username);
             String auth = this.username + ":" + this.password;
-            byte[] encodedAuth = Base64.encodeBase64(auth.getBytes(Charset.forName("US-ASCII")));
-            String authHeader = "Basic " + new String(encodedAuth);
+            byte[] encodedAuth = Base64.encodeBase64(auth.getBytes(Charset.forName("UTF-8")));
+            String authHeader = "Basic " + new String(encodedAuth, Charset.forName("UTF-8"));
             request.setHeader(HttpHeaders.AUTHORIZATION, authHeader);
         }
 
@@ -166,7 +164,7 @@ public class TowerConnector {
 
     private String convertPotentialStringToID(String idToCheck, String api_endpoint) throws AnsibleTowerException {
         try {
-            int asAnInt = Integer.parseInt(idToCheck);
+            Integer.parseInt(idToCheck);
             return idToCheck;
         } catch(NumberFormatException nfe) {
             // We were probablly given a name, lets try and resolve the name to an ID
@@ -314,7 +312,6 @@ public class TowerConnector {
             }
 
             logger.logMessage(json);
-            ClassLoader cl = ClassLoader.getSystemClassLoader();
 
             if(responseObject.containsKey("results")) {
                 for(Object anEvent : responseObject.getJSONArray("results")) {
