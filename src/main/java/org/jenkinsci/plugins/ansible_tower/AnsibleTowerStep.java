@@ -161,6 +161,7 @@ public class AnsibleTowerStep extends AbstractStepImpl {
             if ((computer == null) || (computer.getNode() == null)) {
                 throw new AbortException("The Ansible Tower build step requires to be launched on a node");
             }
+
             AnsibleTowerRunner runner = new AnsibleTowerRunner();
 
             // Doing this will make the options optional in the pipeline step.
@@ -183,7 +184,7 @@ public class AnsibleTowerStep extends AbstractStepImpl {
 
             boolean runResult = runner.runJobTemplate(
                     listener.getLogger(), step.getTowerServer(), step.getJobTemplate(), extraVars,
-                    limit, tags, inventory, credential, verbose, importTowerLogs, removeColor
+                    limit, tags, inventory, credential, verbose, importTowerLogs, removeColor, envVars
             );
             if(!runResult) {
                 throw new AbortException("Ansible Tower build step failed");

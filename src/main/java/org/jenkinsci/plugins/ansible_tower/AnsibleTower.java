@@ -5,6 +5,7 @@ import com.cloudbees.plugins.credentials.common.StandardCredentials;
 import com.cloudbees.plugins.credentials.common.StandardListBoxModel;
 import com.cloudbees.plugins.credentials.common.StandardUsernamePasswordCredentials;
 import com.cloudbees.plugins.credentials.domains.URIRequirementBuilder;
+import hudson.EnvVars;
 import hudson.Extension;
 import hudson.Launcher;
 import hudson.model.*;
@@ -92,10 +93,11 @@ public class AnsibleTower extends Builder {
 			throws InterruptedException, IOException
 	{
 		AnsibleTowerRunner runner = new AnsibleTowerRunner();
+		EnvVars envVars = build.getEnvironment(listener);
 		boolean runResult = runner.runJobTemplate(
 				listener.getLogger(), this.getTowerServer(), this.getJobTemplate(), this.getExtraVars(),
 				this.getLimit(), this.getJobTags(), this.getInventory(), this.getCredential(), this.verbose,
-				this.importTowerLogs, this.getRemoveColor()
+				this.importTowerLogs, this.getRemoveColor(), envVars
 		);
 		if(runResult) {
 			build.setResult(Result.SUCCESS);
