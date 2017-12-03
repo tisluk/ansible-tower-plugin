@@ -12,14 +12,21 @@ public class AnsibleTowerRunner {
     public boolean runJobTemplate(
             PrintStream logger, String towerServer, String jobTemplate, String extraVars, String limit,
             String jobTags, String inventory, String credential, boolean verbose, boolean importTowerLogs,
-            boolean removeColor, EnvVars envVars
+            boolean removeColor, EnvVars envVars, String templateType, boolean importWorkflowChildLogs
     ) {
-        if(verbose) { logger.println("Beginning Ansible Tower Run on "+ towerServer); }
+        if (verbose) {
+            logger.println("Beginning Ansible Tower Run on " + towerServer);
+        }
 
         AnsibleTowerGlobalConfig myConfig = new AnsibleTowerGlobalConfig();
         TowerInstallation towerConfigToRunOn = myConfig.getTowerInstallationByName(towerServer);
-        if(towerConfigToRunOn == null) {
-            logger.println("ERROR: Ansible tower server "+ towerServer +" does not exist in Ansible Tower configuration");
+        if (towerConfigToRunOn == null) {
+            logger.println("ERROR: Ansible tower server " + towerServer + " does not exist in Ansible Tower configuration");
+            return false;
+        }
+
+        if(templateType == null || (!templateType.equalsIgnoreCase(TowerConnector.WORKFLOW_TEMPLATE_TYPE) && !templateType.equalsIgnoreCase(TowerConnector.JOB_TEMPLATE_TYPE))) {
+            logger.println("ERROR: Template type "+ templateType +" was invalid");
             return false;
         }
 
@@ -33,37 +40,54 @@ public class AnsibleTowerRunner {
         String expandedInventory = envVars.expand(inventory);
         String expandedCredential = envVars.expand(credential);
 
-        if(verbose) {
-            if(!expandedJobTemplate.equals(jobTemplate)) { logger.println("Expanded job template to "+ expandedJobTemplate); }
-            if(!expandedExtraVars.equals(extraVars))     { logger.println("Expanded extra vars to "+ expandedExtraVars); }
-            if(!expandedLimit.equals(limit))             { logger.println("Expanded limit to "+ expandedLimit); }
-            if(!expandedJobTags.equals(jobTags))         { logger.println("Expanded job tags to "+ expandedJobTags); }
-            if(!expandedInventory.equals(inventory))     { logger.println("Expanded inventory to "+ expandedInventory); }
-            if(!expandedCredential.equals(credential))   { logger.println("Expanded credentials to "+ expandedCredential); }
+        if (verbose) {
+            if(expandedJobTemplate != null && !expandedJobTemplate.equals(jobTemplate)) {
+                logger.println("Expanded job template to " + expandedJobTemplate);
+            }
+            if(expandedExtraVars != null && !expandedExtraVars.equals(extraVars)) {
+                logger.println("Expanded extra vars to " + expandedExtraVars);
+            }
+            if(expandedLimit != null && !expandedLimit.equals(limit)) {
+                logger.println("Expanded limit to " + expandedLimit);
+            }
+            if(expandedJobTags != null && !expandedJobTags.equals(jobTags)) {
+                logger.println("Expanded job tags to " + expandedJobTags);
+            }
+            if(expandedInventory != null && !expandedInventory.equals(inventory)) {
+                logger.println("Expanded inventory to " + expandedInventory);
+            }
+            if(expandedCredential != null && !expandedCredential.equals(credential)) {
+                logger.println("Expanded credentials to " + expandedCredential);
+            }
         }
 
-        if(verbose) { logger.println("Requesting tower to run job template "+ jobTemplate); }
+        if(verbose) {
+            logger.println("Requesting tower to run " + templateType + " template " + jobTemplate);
+        }
         int myJobID;
         try {
-            myJobID = myTowerConnection.submitJob(expandedJobTemplate, expandedExtraVars, expandedLimit, expandedJobTags, expandedInventory, expandedCredential);
-        } catch(AnsibleTowerException e) {
-            logger.println("ERROR: Unable to request job template invocation "+ e.getMessage());
+            System.out.println("The template type is "+ templateType);
+            myJobID = myTowerConnection.submitTemplate(expandedJobTemplate, expandedExtraVars, expandedLimit, expandedJobTags, expandedInventory, expandedCredential, templateType);
+        } catch (AnsibleTowerException e) {
+            logger.println("ERROR: Unable to request job template invocation " + e.getMessage());
             return false;
         }
 
-        logger.println("Job URL: "+ towerConfigToRunOn.getTowerURL() +"/#/jobs/"+ myJobID);
+        String jobURL = myTowerConnection.getJobURL(myJobID, templateType);
+
+        logger.println("Template Job URL: "+ jobURL);
 
         boolean jobCompleted = false;
         while(!jobCompleted) {
             // First log any events if the user wants them
             try {
-                if (importTowerLogs) { myTowerConnection.logJobEvents(myJobID, logger, removeColor); }
+                if (importTowerLogs) { myTowerConnection.logEvents(myJobID, logger, removeColor, templateType, importWorkflowChildLogs); }
             } catch(AnsibleTowerException e) {
-                logger.println("ERROR: Faile to get job events from tower: "+ e.getMessage());
+                logger.println("ERROR: Failed to get job events from tower: "+ e.getMessage());
                 return false;
             }
             try {
-                jobCompleted = myTowerConnection.isJobCommpleted(myJobID);
+                jobCompleted = myTowerConnection.isJobCommpleted(myJobID, templateType);
             } catch(AnsibleTowerException e) {
                 logger.println("ERROR: Failed to get job status from Tower: "+ e.getMessage());
                 return false;
@@ -79,7 +103,7 @@ public class AnsibleTowerRunner {
         }
 
         try {
-            if(myTowerConnection.isJobFailed(myJobID)) {
+            if(myTowerConnection.isJobFailed(myJobID, templateType)) {
                 logger.println("Tower failed to complete the requeted job");
                 return false;
             } else {

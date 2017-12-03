@@ -36,6 +36,8 @@ import org.apache.http.util.EntityUtils;
 public class TowerConnector {
     private static final int GET = 1;
     private static final int POST = 2;
+    public static final String JOB_TEMPLATE_TYPE = "job";
+    public static final String WORKFLOW_TEMPLATE_TYPE = "workflow";
 
     private String url = null;
     private String username = null;
@@ -43,6 +45,7 @@ public class TowerConnector {
     private boolean trustAllCerts = true;
     private TowerLogger logger = new TowerLogger();
     private Vector<Integer> displayedEvents = new Vector<Integer>();
+    private Vector<Integer> displayedWorkflowNode = new Vector<Integer>();
 
     public TowerConnector(String url, String username, String password) {
         this(url, username, password, false);
@@ -205,15 +208,21 @@ public class TowerConnector {
 
     }
 
-    public int submitJob(String jobTemplate, String extraVars, String limit, String jobTags, String inventory, String credential) throws AnsibleTowerException {
+    public int submitTemplate(String jobTemplate, String extraVars, String limit, String jobTags, String inventory, String credential, String templateType) throws AnsibleTowerException {
         if(jobTemplate == null || jobTemplate.isEmpty()) {
-            throw new AnsibleTowerException("Job template can not be null");
+            throw new AnsibleTowerException("Template can not be null");
         }
 
+        checkTemplateType(templateType);
+
+        String apiEndPoint = "/api/v1/job_templates/";
+        if(templateType.equalsIgnoreCase(WORKFLOW_TEMPLATE_TYPE)) {
+            apiEndPoint = "/api/v1/workflow_job_templates/";
+        }
         try {
-            jobTemplate = convertPotentialStringToID(jobTemplate, "/api/v1/job_templates/");
+            jobTemplate = convertPotentialStringToID(jobTemplate,apiEndPoint);
         } catch(AnsibleTowerException ate) {
-            throw new AnsibleTowerException("Unable to find job template: "+ ate.getMessage());
+            throw new AnsibleTowerException("Unable to find "+ templateType +" template: "+ ate.getMessage());
         }
 
         JSONObject postBody = new JSONObject();
@@ -245,7 +254,7 @@ public class TowerConnector {
         if(extraVars != null && !extraVars.isEmpty()) {
             postBody.put("extra_vars", extraVars);
         }
-        HttpResponse response = makeRequest(POST, "/api/v1/job_templates/" + jobTemplate + "/launch/", postBody);
+        HttpResponse response = makeRequest(POST, apiEndPoint + jobTemplate + "/launch/", postBody);
 
         if(response.getStatusLine().getStatusCode() == 201) {
             JSONObject responseObject;
@@ -261,7 +270,7 @@ public class TowerConnector {
                 return responseObject.getInt("id");
             }
             logger.logMessage(json);
-            throw new AnsibleTowerException("Did not get a job ID from the request. Job response can be found in the jenkins.log");
+            throw new AnsibleTowerException("Did not get an ID from the request. Template response can be found in the jenkins.log");
         } else if(response.getStatusLine().getStatusCode() == 400) {
             throw new AnsibleTowerException("Tower recieved a bad request (400 response code). This can happen if your extre vars, credentials, inventory, etc are bad");
         } else {
@@ -269,8 +278,18 @@ public class TowerConnector {
         }
     }
 
-    public boolean isJobCommpleted(int jobID) throws AnsibleTowerException {
-        HttpResponse response = makeRequest(GET,"/api/v1/jobs/"+ jobID +"/");
+    public void checkTemplateType(String templateType) throws AnsibleTowerException {
+        if(templateType.equalsIgnoreCase(JOB_TEMPLATE_TYPE)) { return; }
+        if(templateType.equalsIgnoreCase(WORKFLOW_TEMPLATE_TYPE)) { return; }
+        throw new AnsibleTowerException("Template type can only be '"+ JOB_TEMPLATE_TYPE +"' or '"+ WORKFLOW_TEMPLATE_TYPE+"'");
+    }
+
+    public boolean isJobCommpleted(int jobID, String templateType) throws AnsibleTowerException {
+        checkTemplateType(templateType);
+
+        String apiEndpoint = "/api/v1/jobs/"+ jobID +"/";
+        if(templateType.equalsIgnoreCase(WORKFLOW_TEMPLATE_TYPE)) { apiEndpoint = "/api/v1/workflow_jobs/"+ jobID +"/"; }
+        HttpResponse response = makeRequest(GET, apiEndpoint);
 
         if(response.getStatusLine().getStatusCode() == 200) {
             JSONObject responseObject;
@@ -298,7 +317,61 @@ public class TowerConnector {
     }
 
 
-    public void logJobEvents(int jobID, PrintStream jenkinsLogger, boolean removeColor) throws AnsibleTowerException {
+    public void logEvents(int jobID, PrintStream jenkinsLogger, boolean removeColor, String templateType, boolean importWorkflowChildLogs) throws AnsibleTowerException {
+        checkTemplateType(templateType);
+        if(templateType.equalsIgnoreCase(JOB_TEMPLATE_TYPE)) {
+            logJobEvents(jobID, jenkinsLogger, removeColor);
+        } else if(templateType.equalsIgnoreCase(WORKFLOW_TEMPLATE_TYPE)){
+            logWorkflowEvents(jobID, jenkinsLogger, removeColor, importWorkflowChildLogs);
+        } else {
+            throw new AnsibleTowerException("Tower Connector does not know how to log events for a "+ templateType);
+        }
+    }
+
+    private void logWorkflowEvents(int jobID, PrintStream jenkinsLogger, boolean removeColor, boolean importWorkflowChildLogs) throws AnsibleTowerException {
+        HttpResponse response = makeRequest(GET, "/api/v1/workflow_jobs/"+ jobID +"/workflow_nodes/");
+
+        if(response.getStatusLine().getStatusCode() == 200) {
+            JSONObject responseObject;
+            String json;
+            try {
+                json = EntityUtils.toString(response.getEntity());
+                responseObject = JSONObject.fromObject(json);
+            } catch(IOException ioe) {
+                throw new AnsibleTowerException("Unable to read response and convert it into json: "+ ioe.getMessage());
+            }
+
+            logger.logMessage(json);
+
+            if(responseObject.containsKey("results")) {
+                for(Object anEventObject : responseObject.getJSONArray("results")) {
+                    JSONObject anEvent = (JSONObject) anEventObject;
+                    Integer eventId = anEvent.getInt("id");
+                    if(!displayedWorkflowNode.contains(eventId)) {
+                        if(anEvent.containsKey("summary_fields")) {
+                            JSONObject summaryFields = anEvent.getJSONObject("summary_fields");
+                            if(summaryFields.containsKey("job")) {
+                                JSONObject job = summaryFields.getJSONObject("job");
+                                if(job.containsKey("status") && !job.getString("status").equalsIgnoreCase("running")) {
+                                    displayedWorkflowNode.add(eventId);
+                                    jenkinsLogger.println( job.getString("name") +" => "+ job.getString("status") +" "+ this.getJobURL(job.getInt("id"), JOB_TEMPLATE_TYPE));
+                                    if(importWorkflowChildLogs) {
+                                        // We only need to call this once because the job is completed at this point
+                                        logJobEvents(job.getInt("id"), jenkinsLogger, removeColor);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            throw new AnsibleTowerException("Unexpected error code returned ("+ response.getStatusLine().getStatusCode() +")");
+        }
+
+    }
+
+    private void logJobEvents(int jobID, PrintStream jenkinsLogger, boolean removeColor) throws AnsibleTowerException {
         HttpResponse response = makeRequest(GET, "/api/v1/jobs/"+ jobID +"/job_events/");
 
         if(response.getStatusLine().getStatusCode() == 200) {
@@ -335,8 +408,12 @@ public class TowerConnector {
         }
     }
 
-    public boolean isJobFailed(int jobID) throws AnsibleTowerException {
-        HttpResponse response = makeRequest(GET,"/api/v1/jobs/"+ jobID +"/");
+    public boolean isJobFailed(int jobID, String templateType) throws AnsibleTowerException {
+        checkTemplateType(templateType);
+
+        String apiEndPoint = "/api/v1/jobs/"+ jobID +"/";
+        if(templateType.equalsIgnoreCase(WORKFLOW_TEMPLATE_TYPE)) { apiEndPoint = "/api/v1/workflow_jobs/"+ jobID +"/"; }
+        HttpResponse response = makeRequest(GET, apiEndPoint);
 
         if(response.getStatusLine().getStatusCode() == 200) {
             JSONObject responseObject;
@@ -356,5 +433,16 @@ public class TowerConnector {
         } else {
             throw new AnsibleTowerException("Unexpected error code returned (" + response.getStatusLine().getStatusCode() + ")");
         }
+    }
+
+    public String getJobURL(int myJobID, String templateType) {
+        String returnURL = url +"/#/";
+        if (templateType.equalsIgnoreCase(TowerConnector.JOB_TEMPLATE_TYPE)) {
+            returnURL += "jobs";
+        } else {
+            returnURL += "workflows";
+        }
+        returnURL += "/"+ myJobID;
+        return returnURL;
     }
 }

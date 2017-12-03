@@ -19,22 +19,24 @@ import org.kohsuke.stapler.DataBoundSetter;
 import javax.annotation.Nonnull;
 
 public class AnsibleTowerStep extends AbstractStepImpl {
-    private String towerServer      = "";
-    private String jobTemplate      = "";
-    private String extraVars        = "";
-    private String limit            = "";
-    private String jobTags          = "";
-    private String inventory        = "";
-    private String credential       = "";
-    private Boolean verbose         = false;
-    private Boolean importTowerLogs = false;
-    private Boolean removeColor = false;
+    private String towerServer              = "";
+    private String jobTemplate              = "";
+    private String extraVars                = "";
+    private String limit                    = "";
+    private String jobTags                  = "";
+    private String inventory                = "";
+    private String credential               = "";
+    private Boolean verbose                 = false;
+    private Boolean importTowerLogs         = false;
+    private Boolean removeColor             = false;
+    private String templateType             = "job";
+    private Boolean importWorkflowChildLogs = false;
 
     @DataBoundConstructor
     public AnsibleTowerStep(
             @Nonnull String towerServer, @Nonnull String jobTemplate, String extraVars, String jobTags,
             String limit, String inventory, String credential, Boolean verbose, Boolean importTowerLogs,
-            Boolean removeColor
+            Boolean removeColor, String templateType, Boolean importWorkflowChildLogs
     ) {
         this.towerServer = towerServer;
         this.jobTemplate = jobTemplate;
@@ -46,20 +48,24 @@ public class AnsibleTowerStep extends AbstractStepImpl {
         this.verbose = verbose;
         this.importTowerLogs = importTowerLogs;
         this.removeColor = removeColor;
+        this.templateType = templateType;
+        this.importWorkflowChildLogs = importWorkflowChildLogs;
     }
 
     @Nonnull
-    public String getTowerServer() { return towerServer; }
+    public String getTowerServer()              { return towerServer; }
     @Nonnull
-    public String getJobTemplate()      { return jobTemplate; }
-    public String getExtraVars()        { return extraVars; }
-    public String getJobTags()          { return jobTags; }
-    public String getLimit()            { return limit; }
-    public String getInventory()        { return inventory; }
-    public String getCredential()       { return credential; }
-    public Boolean getVerbose()         { return verbose; }
-    public Boolean getImportTowerLogs() { return importTowerLogs; }
-    public Boolean getRemoveColor()     { return removeColor; }
+    public String getJobTemplate()              { return jobTemplate; }
+    public String getExtraVars()                { return extraVars; }
+    public String getJobTags()                  { return jobTags; }
+    public String getLimit()                    { return limit; }
+    public String getInventory()                { return inventory; }
+    public String getCredential()               { return credential; }
+    public Boolean getVerbose()                 { return verbose; }
+    public Boolean getImportTowerLogs()         { return importTowerLogs; }
+    public Boolean getRemoveColor()             { return removeColor; }
+    public String getTemplateType()             { return templateType; }
+    public Boolean getImportWorkflowChildLogs() { return importWorkflowChildLogs; }
 
     @DataBoundSetter
     public void setTowerServer(String towerServer) { this.towerServer = towerServer; }
@@ -81,6 +87,10 @@ public class AnsibleTowerStep extends AbstractStepImpl {
     public void setImportTowerLogs(Boolean importTowerLogs) { this.importTowerLogs = importTowerLogs; }
     @DataBoundSetter
     public void setRemoveColor(Boolean removeColor) { this.removeColor = removeColor; }
+    @DataBoundSetter
+    public void setTemplateType(String templateType) { this.templateType = templateType; }
+    @DataBoundSetter
+    public void setImportWorkflowChildLogs(Boolean importWorkflowChildLogs) { this.importWorkflowChildLogs = importWorkflowChildLogs; }
 
     public boolean isGlobalColorAllowed() {
         System.out.println("Using the class is global color allowed");
@@ -89,16 +99,18 @@ public class AnsibleTowerStep extends AbstractStepImpl {
 
     @Extension
     public static final class DescriptorImpl extends AbstractStepDescriptorImpl {
-        public static final String towerServer      = AnsibleTower.DescriptorImpl.towerServer;
-        public static final String jobTemplate      = AnsibleTower.DescriptorImpl.jobTemplate;
-        public static final String extraVars        = AnsibleTower.DescriptorImpl.extraVars;
-        public static final String limit            = AnsibleTower.DescriptorImpl.limit;
-        public static final String jobTags          = AnsibleTower.DescriptorImpl.jobTags;
-        public static final String inventory        = AnsibleTower.DescriptorImpl.inventory;
-        public static final String credential       = AnsibleTower.DescriptorImpl.credential;
-        public static final Boolean verbose         = AnsibleTower.DescriptorImpl.verbose;
-        public static final Boolean importTowerLogs = AnsibleTower.DescriptorImpl.importTowerLogs;
-        public static final Boolean removeColor     = AnsibleTower.DescriptorImpl.removeColor;
+        public static final String towerServer              = AnsibleTower.DescriptorImpl.towerServer;
+        public static final String jobTemplate              = AnsibleTower.DescriptorImpl.jobTemplate;
+        public static final String extraVars                = AnsibleTower.DescriptorImpl.extraVars;
+        public static final String limit                    = AnsibleTower.DescriptorImpl.limit;
+        public static final String jobTags                  = AnsibleTower.DescriptorImpl.jobTags;
+        public static final String inventory                = AnsibleTower.DescriptorImpl.inventory;
+        public static final String credential               = AnsibleTower.DescriptorImpl.credential;
+        public static final Boolean verbose                 = AnsibleTower.DescriptorImpl.verbose;
+        public static final Boolean importTowerLogs         = AnsibleTower.DescriptorImpl.importTowerLogs;
+        public static final Boolean removeColor             = AnsibleTower.DescriptorImpl.removeColor;
+        public static final String templateType             = AnsibleTower.DescriptorImpl.templateType;
+        public static final Boolean importWorkflowChildLogs = AnsibleTower.DescriptorImpl.importWorkflowChildLogs;
 
         public DescriptorImpl() {
             super(AnsibleTowerStepExecution.class);
@@ -120,6 +132,13 @@ public class AnsibleTowerStep extends AbstractStepImpl {
             for (TowerInstallation towerServer : AnsibleTowerGlobalConfig.get().getTowerInstallation()) {
                 items.add(towerServer.getTowerDisplayName());
             }
+            return items;
+        }
+
+        public ListBoxModel doFillTemplateTypeItems() {
+            ListBoxModel items = new ListBoxModel();
+            items.add("job");
+            items.add("workflow");
             return items;
         }
 
@@ -181,10 +200,15 @@ public class AnsibleTowerStep extends AbstractStepImpl {
             if(step.getImportTowerLogs() != null) { importTowerLogs = step.getImportTowerLogs(); }
             boolean removeColor = false;
             if(step.getRemoveColor() != null) { removeColor = step.getRemoveColor(); }
+            String templateType = "job";
+            if(step.getTemplateType() != null) { templateType = step.getTemplateType(); }
+            boolean importWorkflowChildLogs = false;
+            if(step.getImportWorkflowChildLogs() != null) { importWorkflowChildLogs = step.getImportWorkflowChildLogs(); }
 
             boolean runResult = runner.runJobTemplate(
                     listener.getLogger(), step.getTowerServer(), step.getJobTemplate(), extraVars,
-                    limit, tags, inventory, credential, verbose, importTowerLogs, removeColor, envVars
+                    limit, tags, inventory, credential, verbose, importTowerLogs, removeColor, envVars,
+                    templateType, importWorkflowChildLogs
             );
             if(!runResult) {
                 throw new AbortException("Ansible Tower build step failed");

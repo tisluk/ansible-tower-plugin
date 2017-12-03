@@ -13,6 +13,7 @@ import hudson.tasks.BuildStepDescriptor;
 import hudson.tasks.Builder;
 import hudson.util.ListBoxModel;
 import jenkins.model.Jenkins;
+import org.jenkinsci.plugins.ansible_tower.util.TowerConnector;
 import org.jenkinsci.plugins.ansible_tower.util.TowerInstallation;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.DataBoundSetter;
@@ -35,12 +36,14 @@ public class AnsibleTower extends Builder {
     private Boolean verbose                 = DescriptorImpl.verbose;
     private Boolean importTowerLogs			= DescriptorImpl.importTowerLogs;
     private Boolean removeColor				= DescriptorImpl.removeColor;
+	private String templateType				= DescriptorImpl.templateType;
+	private Boolean importWorkflowChildLogs	= DescriptorImpl.importWorkflowChildLogs;
 
 	@DataBoundConstructor
 	public AnsibleTower(
 			@Nonnull String towerServer, @Nonnull String jobTemplate, String extraVars, String jobTags,
 			String limit, String inventory, String credential, Boolean verbose, Boolean importTowerLogs,
-			Boolean removeColor
+			Boolean removeColor, String templateType, Boolean importWorkflowChildLogs
 	) {
 		this.towerServer = towerServer;
 		this.jobTemplate = jobTemplate;
@@ -52,6 +55,8 @@ public class AnsibleTower extends Builder {
 		this.verbose = verbose;
 		this.importTowerLogs = importTowerLogs;
 		this.removeColor = removeColor;
+		this.templateType = templateType;
+		this.importWorkflowChildLogs = importWorkflowChildLogs;
 	}
 
 	@Nonnull
@@ -66,6 +71,8 @@ public class AnsibleTower extends Builder {
 	public Boolean getVerbose() { return verbose; }
 	public Boolean getImportTowerLogs() { return importTowerLogs; }
 	public Boolean getRemoveColor() { return removeColor; }
+	public String getTemplateType() { return templateType; }
+	public Boolean getImportWorkflowChildLogs() { return importWorkflowChildLogs; }
 
 	@DataBoundSetter
 	public void setTowerServer(String towerServer) { this.towerServer = towerServer; }
@@ -87,6 +94,10 @@ public class AnsibleTower extends Builder {
 	public void setImportTowerLogs(Boolean importTowerLogs) { this.importTowerLogs = importTowerLogs; }
 	@DataBoundSetter
 	public void setRemoveColor(Boolean removeColor) { this.removeColor = removeColor; }
+	@DataBoundSetter
+	public void setTemplateType(String templateType) { this.templateType = templateType; }
+	@DataBoundSetter
+	public void setImportWorkflowChildLogs(Boolean importWorkflowChildLogs) { this.importWorkflowChildLogs = importWorkflowChildLogs; }
 
     @Override
     public boolean perform(AbstractBuild<?,?> build, Launcher launcher, BuildListener listener)
@@ -97,7 +108,7 @@ public class AnsibleTower extends Builder {
 		boolean runResult = runner.runJobTemplate(
 				listener.getLogger(), this.getTowerServer(), this.getJobTemplate(), this.getExtraVars(),
 				this.getLimit(), this.getJobTags(), this.getInventory(), this.getCredential(), this.verbose,
-				this.importTowerLogs, this.getRemoveColor(), envVars
+				this.importTowerLogs, this.getRemoveColor(), envVars, this.templateType, importWorkflowChildLogs
 		);
 		if(runResult) {
 			build.setResult(Result.SUCCESS);
@@ -110,16 +121,18 @@ public class AnsibleTower extends Builder {
 
 	@Extension
     public static final class DescriptorImpl extends BuildStepDescriptor<Builder> {
-        public static final String towerServer    	= "";
-        public static final String jobTemplate    	= "";
-		public static final String extraVars      	= "";
-		public static final String limit          	= "";
-        public static final String jobTags        	= "";
-		public static final String inventory      	= "";
-		public static final String credential     	= "";
-		public static final Boolean verbose       	= false;
-		public static final Boolean importTowerLogs	= false;
-		public static final Boolean removeColor		= false;
+        public static final String towerServer    			= "";
+        public static final String jobTemplate    			= "";
+		public static final String extraVars      			= "";
+		public static final String limit          			= "";
+        public static final String jobTags        			= "";
+		public static final String inventory      			= "";
+		public static final String credential     			= "";
+		public static final Boolean verbose       			= false;
+		public static final Boolean importTowerLogs			= false;
+		public static final Boolean removeColor				= false;
+		public static final String templateType				= "job";
+		public static final Boolean importWorkflowChildLogs	= false;
 
         public DescriptorImpl() {
             load();
@@ -142,6 +155,13 @@ public class AnsibleTower extends Builder {
 			}
 			return items;
         }
+
+        public ListBoxModel doFillTemplateTypeItems() {
+        	ListBoxModel items = new ListBoxModel();
+        	items.add("job");
+        	items.add("workflow");
+        	return items;
+		}
 
         // Some day I'd like to be able to make all of these dropdowns from quering the tower API
 		// Maybe not in real time because that would be slow when loading a the configure job
