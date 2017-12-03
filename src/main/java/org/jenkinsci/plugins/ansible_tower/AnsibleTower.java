@@ -105,10 +105,20 @@ public class AnsibleTower extends Builder {
 	{
 		AnsibleTowerRunner runner = new AnsibleTowerRunner();
 		EnvVars envVars = build.getEnvironment(listener);
+
+		//
+		// When adding a new option, you need to check if its null.
+		// An existing job will not have the new fields set so null will get passed through if you don't
+		//
+		String templateType = "job";
+		if(this.getTemplateType() != null) { templateType = this.getTemplateType(); }
+		boolean importWorkflowChildLogs = false;
+		if(this.getImportWorkflowChildLogs() != null) { importWorkflowChildLogs = this.getImportWorkflowChildLogs(); }
+
 		boolean runResult = runner.runJobTemplate(
 				listener.getLogger(), this.getTowerServer(), this.getJobTemplate(), this.getExtraVars(),
 				this.getLimit(), this.getJobTags(), this.getInventory(), this.getCredential(), this.verbose,
-				this.importTowerLogs, this.getRemoveColor(), envVars, this.templateType, importWorkflowChildLogs
+				this.importTowerLogs, this.getRemoveColor(), envVars, templateType, importWorkflowChildLogs
 		);
 		if(runResult) {
 			build.setResult(Result.SUCCESS);
