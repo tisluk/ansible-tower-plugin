@@ -61,6 +61,12 @@ public class AnsibleTowerRunner {
             }
         }
 
+        if(expandedJobTags != null && expandedJobTags.equalsIgnoreCase("")) {
+            if(!expandedJobTags.startsWith(",")) {
+                expandedJobTags = ","+ expandedJobTags;
+            }
+        }
+
         if(verbose) {
             logger.println("Requesting tower to run " + templateType + " template " + jobTemplate);
         }
