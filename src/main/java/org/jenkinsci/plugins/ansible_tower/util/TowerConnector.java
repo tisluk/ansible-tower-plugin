@@ -226,7 +226,6 @@ public class TowerConnector {
         }
 
         // Now get the job template to we can check the options being passed in
-        String templateEndPoint = apiEndPoint + jobTemplate + "/";
         HttpResponse response = makeRequest(GET, apiEndPoint + jobTemplate + "/");
         if (response.getStatusLine().getStatusCode() != 200) {
             throw new AnsibleTowerException("Unexpected error code returned when getting template (" + response.getStatusLine().getStatusCode() + ")");
