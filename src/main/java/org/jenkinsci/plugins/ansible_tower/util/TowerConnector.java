@@ -208,21 +208,45 @@ public class TowerConnector {
 
     }
 
-    public int submitTemplate(String jobTemplate, String extraVars, String limit, String jobTags, String inventory, String credential, String templateType) throws AnsibleTowerException {
+    public JSONObject getJobTemplate(String jobTemplate, String templateType) throws AnsibleTowerException {
         if(jobTemplate == null || jobTemplate.isEmpty()) {
             throw new AnsibleTowerException("Template can not be null");
         }
 
         checkTemplateType(templateType);
-
         String apiEndPoint = "/api/v1/job_templates/";
         if(templateType.equalsIgnoreCase(WORKFLOW_TEMPLATE_TYPE)) {
             apiEndPoint = "/api/v1/workflow_job_templates/";
         }
+
         try {
             jobTemplate = convertPotentialStringToID(jobTemplate,apiEndPoint);
         } catch(AnsibleTowerException ate) {
             throw new AnsibleTowerException("Unable to find "+ templateType +" template: "+ ate.getMessage());
+        }
+
+        // Now get the job template to we can check the options being passed in
+        String templateEndPoint = apiEndPoint + jobTemplate + "/";
+        HttpResponse response = makeRequest(GET, apiEndPoint + jobTemplate + "/");
+        if (response.getStatusLine().getStatusCode() != 200) {
+            throw new AnsibleTowerException("Unexpected error code returned when getting template (" + response.getStatusLine().getStatusCode() + ")");
+        }
+        String json;
+        try {
+            json = EntityUtils.toString(response.getEntity());
+            return JSONObject.fromObject(json);
+        } catch (IOException ioe) {
+            throw new AnsibleTowerException("Unable to read template response and convert it into json: " + ioe.getMessage());
+        }
+    }
+
+
+    public int submitTemplate(int jobTemplate, String extraVars, String limit, String jobTags, String inventory, String credential, String templateType) throws AnsibleTowerException {
+        checkTemplateType(templateType);
+
+        String apiEndPoint = "/api/v1/job_templates/";
+        if(templateType.equalsIgnoreCase(WORKFLOW_TEMPLATE_TYPE)) {
+            apiEndPoint = "/api/v1/workflow_job_templates/";
         }
 
         JSONObject postBody = new JSONObject();
@@ -328,6 +352,9 @@ public class TowerConnector {
         }
     }
 
+    private static String UNIFIED_JOB_TYPE = "unified_job_type";
+    private static String UNIFIED_JOB_TEMPLATE = "unified_job_template";
+
     private void logWorkflowEvents(int jobID, PrintStream jenkinsLogger, boolean removeColor, boolean importWorkflowChildLogs) throws AnsibleTowerException {
         HttpResponse response = makeRequest(GET, "/api/v1/workflow_jobs/"+ jobID +"/workflow_nodes/");
 
@@ -347,22 +374,44 @@ public class TowerConnector {
                 for(Object anEventObject : responseObject.getJSONArray("results")) {
                     JSONObject anEvent = (JSONObject) anEventObject;
                     Integer eventId = anEvent.getInt("id");
-                    if(!displayedWorkflowNode.contains(eventId)) {
-                        if(anEvent.containsKey("summary_fields")) {
-                            JSONObject summaryFields = anEvent.getJSONObject("summary_fields");
-                            if(summaryFields.containsKey("job")) {
-                                JSONObject job = summaryFields.getJSONObject("job");
-                                if(job.containsKey("status") && !job.getString("status").equalsIgnoreCase("running")) {
-                                    displayedWorkflowNode.add(eventId);
-                                    jenkinsLogger.println( job.getString("name") +" => "+ job.getString("status") +" "+ this.getJobURL(job.getInt("id"), JOB_TEMPLATE_TYPE));
-                                    if(importWorkflowChildLogs) {
-                                        // We only need to call this once because the job is completed at this point
-                                        logJobEvents(job.getInt("id"), jenkinsLogger, removeColor);
-                                    }
-                                }
-                            }
+                    if(displayedWorkflowNode.contains(eventId)) { continue; }
+
+                    if(!anEvent.containsKey("summary_fields")) { continue; }
+
+                    JSONObject summaryFields = anEvent.getJSONObject("summary_fields");
+                    if(!summaryFields.containsKey("job")) { continue; }
+                    if(!summaryFields.containsKey(UNIFIED_JOB_TEMPLATE)) { continue; }
+
+                    JSONObject templateType = summaryFields.getJSONObject(UNIFIED_JOB_TEMPLATE);
+                    if(!templateType.containsKey(UNIFIED_JOB_TYPE)) { continue; }
+
+                    JSONObject job = summaryFields.getJSONObject("job");
+                    if(
+                            !job.containsKey("status") ||
+                            job.getString("status").equalsIgnoreCase("running") ||
+                            job.getString("status").equalsIgnoreCase("pending")
+                    ) {
+                        continue;
+                    }
+
+                    displayedWorkflowNode.add(eventId);
+                    jenkinsLogger.println(job.getString("name") +" => "+ job.getString("status") +" "+ this.getJobURL(job.getInt("id"), JOB_TEMPLATE_TYPE));
+
+                    if(importWorkflowChildLogs) {
+                        if(templateType.getString(UNIFIED_JOB_TYPE).equalsIgnoreCase("job")) {
+                            // We only need to call this once because the job is completed at this point
+                            logJobEvents(job.getInt("id"), jenkinsLogger, removeColor);
+                        } else if(templateType.getString(UNIFIED_JOB_TYPE).equalsIgnoreCase("project_update")) {
+                            logProjectSync(job.getInt("id"), jenkinsLogger, removeColor);
+                        } else if(templateType.getString(UNIFIED_JOB_TYPE).equalsIgnoreCase("inventory_update")) {
+                            logInventorySync(job.getInt("id"), jenkinsLogger, removeColor);
+                        } else {
+                            jenkinsLogger.println("Unknown job type in workflow: "+ templateType.getString(UNIFIED_JOB_TYPE));
                         }
                     }
+                    // Print two spaces to put some space between this and the next task.
+                    jenkinsLogger.println("");
+                    jenkinsLogger.println("");
                 }
             }
         } else {
@@ -371,8 +420,68 @@ public class TowerConnector {
 
     }
 
+    private void logLine(String output, PrintStream jenkinsLogger, boolean removeColor) throws AnsibleTowerException {
+        String[] lines = output.split("\\r\\n");
+        for(String line : lines) {
+            if(removeColor) {
+                // This regex was found on https://stackoverflow.com/questions/14652538/remove-ascii-color-codes
+                line = line.replaceAll("\u001B\\[[;\\d]*m", "");
+            }
+            jenkinsLogger.println( line );
+        }
+    }
+
+
+    private void logInventorySync(int syncID, PrintStream jenkinsLogger, boolean removeColor) throws AnsibleTowerException {
+        String apiURL = "/api/v1/inventory_updates/"+ syncID +"/";
+        HttpResponse response = makeRequest(GET, apiURL);
+        if(response.getStatusLine().getStatusCode() == 200) {
+            JSONObject responseObject;
+            String json;
+            try {
+                json = EntityUtils.toString(response.getEntity());
+                responseObject = JSONObject.fromObject(json);
+            } catch(IOException ioe) {
+                throw new AnsibleTowerException("Unable to read response and convert it into json: "+ ioe.getMessage());
+            }
+
+            logger.logMessage(json);
+
+            if(responseObject.containsKey("result_stdout")) {
+                logLine(responseObject.getString("result_stdout"), jenkinsLogger, removeColor);
+            }
+        } else {
+            throw new AnsibleTowerException("Unexpected error code returned ("+ response.getStatusLine().getStatusCode() +")");
+        }
+    }
+
+
+    private void logProjectSync(int syncID, PrintStream jenkinsLogger, boolean removeColor) throws AnsibleTowerException {
+        String apiURL = "/api/v1/project_updates/"+ syncID +"/";
+        HttpResponse response = makeRequest(GET, apiURL);
+        if(response.getStatusLine().getStatusCode() == 200) {
+            JSONObject responseObject;
+            String json;
+            try {
+                json = EntityUtils.toString(response.getEntity());
+                responseObject = JSONObject.fromObject(json);
+            } catch(IOException ioe) {
+                throw new AnsibleTowerException("Unable to read response and convert it into json: "+ ioe.getMessage());
+            }
+
+            logger.logMessage(json);
+
+            if(responseObject.containsKey("result_stdout")) {
+                logLine(responseObject.getString("result_stdout"), jenkinsLogger, removeColor);
+            }
+        } else {
+            throw new AnsibleTowerException("Unexpected error code returned ("+ response.getStatusLine().getStatusCode() +")");
+        }
+    }
+
     private void logJobEvents(int jobID, PrintStream jenkinsLogger, boolean removeColor) throws AnsibleTowerException {
-        HttpResponse response = makeRequest(GET, "/api/v1/jobs/"+ jobID +"/job_events/");
+        String apiURL = "/api/v1/jobs/" + jobID + "/job_events/";
+        HttpResponse response = makeRequest(GET, apiURL);
 
         if(response.getStatusLine().getStatusCode() == 200) {
             JSONObject responseObject;
@@ -392,14 +501,7 @@ public class TowerConnector {
                     String stdOut = ((JSONObject) anEvent).getString("stdout");
                     if(!displayedEvents.contains(eventId)) {
                         displayedEvents.add(eventId);
-                        String[] lines = stdOut.split("\\r\\n");
-                        for(String line : lines) {
-                            if(removeColor) {
-                                // This regex was found on https://stackoverflow.com/questions/14652538/remove-ascii-color-codes
-                                line = line.replaceAll("\u001B\\[[;\\d]*m", "");
-                            }
-                            jenkinsLogger.println( line );
-                        }
+                        logLine(stdOut, jenkinsLogger, removeColor);
                     }
                 }
             }
