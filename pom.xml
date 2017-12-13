@@ -133,6 +133,12 @@
             <artifactId>credentials</artifactId>
             <version>1.22</version>
         </dependency>
+        <dependency>
+            <groupId>org.jenkins-ci.plugins</groupId>
+            <artifactId>envinject</artifactId>
+            <version>2.1.5</version>
+            <optional>true</optional>
+        </dependency>
         <!-- https://mvnrepository.com/artifact/commons-codec/commons-codec -->
         <dependency>
             <groupId>commons-codec</groupId>
