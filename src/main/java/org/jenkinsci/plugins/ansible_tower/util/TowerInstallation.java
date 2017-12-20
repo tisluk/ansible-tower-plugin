@@ -1,5 +1,9 @@
 package org.jenkinsci.plugins.ansible_tower.util;
 
+/*
+    This class represents a Tower installation
+ */
+
 import static com.cloudbees.plugins.credentials.CredentialsMatchers.instanceOf;
 import com.cloudbees.plugins.credentials.common.StandardListBoxModel;
 import com.cloudbees.plugins.credentials.common.UsernamePasswordCredentials;

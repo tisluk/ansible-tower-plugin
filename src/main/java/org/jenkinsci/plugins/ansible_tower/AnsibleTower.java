@@ -1,5 +1,10 @@
 package org.jenkinsci.plugins.ansible_tower;
 
+/*
+        This calss is the standard workflow step
+        We simply take the data from Jenkins and call an AnsibleTowerRunner
+ */
+
 import hudson.EnvVars;
 import hudson.Extension;
 import hudson.Launcher;

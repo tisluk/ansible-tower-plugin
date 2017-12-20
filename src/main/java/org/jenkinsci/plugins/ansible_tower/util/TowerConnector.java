@@ -1,5 +1,9 @@
 package org.jenkinsci.plugins.ansible_tower.util;
 
+/*
+    This class handles all of the connections (api calls) to Tower itself
+ */
+
 import com.google.common.net.HttpHeaders;
 import org.jenkinsci.plugins.ansible_tower.AnsibleTowerException;
 

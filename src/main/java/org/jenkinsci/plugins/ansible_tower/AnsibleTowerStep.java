@@ -1,5 +1,10 @@
 package org.jenkinsci.plugins.ansible_tower;
 
+/*
+    This class is the pipeline step
+    We simply take the data from Jenkins and call an AnsibleTowerRunner
+ */
+
 import com.google.inject.Inject;
 import hudson.Launcher;
 import hudson.model.Computer;

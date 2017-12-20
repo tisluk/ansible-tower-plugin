@@ -1,5 +1,10 @@
 package org.jenkinsci.plugins.ansible_tower;
 
+/*
+    This class is a bridge between the Jenkins workflow/plugin step and TowerConnector.
+    The intention is to abstract the "work" from the two Jenkins classes
+ */
+
 import hudson.EnvVars;
 import hudson.FilePath;
 import hudson.model.Run;

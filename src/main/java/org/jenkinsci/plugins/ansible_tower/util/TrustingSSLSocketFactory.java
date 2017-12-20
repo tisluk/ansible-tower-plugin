@@ -1,5 +1,10 @@
 package org.jenkinsci.plugins.ansible_tower.util;
 
+/*
+    This class is used only if we tell Jenkins to ignore the Tower cert.
+    It makes a and sets an all trusting SSL Socket Factory
+ */
+
 import java.io.IOException;
 import java.net.Socket;
 import java.net.UnknownHostException;

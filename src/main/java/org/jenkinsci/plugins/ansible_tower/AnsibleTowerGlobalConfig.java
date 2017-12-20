@@ -1,5 +1,9 @@
 package org.jenkinsci.plugins.ansible_tower;
 
+/*
+    This class manages the list of Tower installations in the Global config section
+ */
+
 import hudson.Extension;
 import hudson.XmlFile;
 import hudson.util.XStream2;
