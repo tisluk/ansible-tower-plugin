@@ -1,10 +1,5 @@
 package org.jenkinsci.plugins.ansible_tower;
 
-import com.cloudbees.plugins.credentials.common.AbstractIdCredentialsListBoxModel;
-import com.cloudbees.plugins.credentials.common.StandardCredentials;
-import com.cloudbees.plugins.credentials.common.StandardListBoxModel;
-import com.cloudbees.plugins.credentials.common.StandardUsernamePasswordCredentials;
-import com.cloudbees.plugins.credentials.domains.URIRequirementBuilder;
 import hudson.EnvVars;
 import hudson.Extension;
 import hudson.Launcher;
@@ -12,8 +7,6 @@ import hudson.model.*;
 import hudson.tasks.BuildStepDescriptor;
 import hudson.tasks.Builder;
 import hudson.util.ListBoxModel;
-import jenkins.model.Jenkins;
-import org.jenkinsci.plugins.ansible_tower.util.TowerConnector;
 import org.jenkinsci.plugins.ansible_tower.util.TowerInstallation;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.DataBoundSetter;
@@ -118,7 +111,8 @@ public class AnsibleTower extends Builder {
 		boolean runResult = runner.runJobTemplate(
 				listener.getLogger(), this.getTowerServer(), this.getJobTemplate(), this.getExtraVars(),
 				this.getLimit(), this.getJobTags(), this.getInventory(), this.getCredential(), this.verbose,
-				this.importTowerLogs, this.getRemoveColor(), envVars, templateType, importWorkflowChildLogs
+				this.importTowerLogs, this.getRemoveColor(), envVars, templateType, importWorkflowChildLogs,
+				build.getWorkspace(), build
 		);
 		if(runResult) {
 			build.setResult(Result.SUCCESS);
@@ -129,7 +123,7 @@ public class AnsibleTower extends Builder {
 		return runResult;
     }
 
-	@Extension
+	@Extension(optional = true)
     public static final class DescriptorImpl extends BuildStepDescriptor<Builder> {
         public static final String towerServer    			= "";
         public static final String jobTemplate    			= "";

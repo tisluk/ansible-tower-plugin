@@ -1,19 +1,23 @@
 package org.jenkinsci.plugins.ansible_tower;
 
 import hudson.EnvVars;
-import hudson.model.AbstractBuild;
-import hudson.model.Result;
+import hudson.FilePath;
+import hudson.model.Run;
+import jenkins.model.Jenkins;
 import net.sf.json.JSONObject;
 import org.jenkinsci.plugins.ansible_tower.util.TowerConnector;
 import org.jenkinsci.plugins.ansible_tower.util.TowerInstallation;
+import org.jenkinsci.plugins.envinject.service.EnvInjectActionSetter;
 
 import java.io.PrintStream;
+import java.util.HashMap;
 
 public class AnsibleTowerRunner {
     public boolean runJobTemplate(
             PrintStream logger, String towerServer, String jobTemplate, String extraVars, String limit,
             String jobTags, String inventory, String credential, boolean verbose, boolean importTowerLogs,
-            boolean removeColor, EnvVars envVars, String templateType, boolean importWorkflowChildLogs
+            boolean removeColor, EnvVars envVars, String templateType, boolean importWorkflowChildLogs,
+            FilePath ws, Run<?,?> run
     ) {
         if (verbose) {
             logger.println("Beginning Ansible Tower Run on " + towerServer);
@@ -32,6 +36,14 @@ public class AnsibleTowerRunner {
         }
 
         TowerConnector myTowerConnection = towerConfigToRunOn.getTowerConnector();
+
+        // If they came in empty then set them to null so that we don't pass a nothing through
+        if(jobTemplate.equals(""))  { jobTemplate = null; }
+        if(extraVars.equals(""))    { extraVars= null; }
+        if(limit.equals(""))        { limit= null; }
+        if(jobTags.equals(""))      { jobTags= null; }
+        if(inventory.equals(""))    { inventory= null; }
+        if(credential.equals(""))   { credential= null; }
 
         // Expand all of the parameters
         String expandedJobTemplate = envVars.expand(jobTemplate);
@@ -71,7 +83,7 @@ public class AnsibleTowerRunner {
         // Get the job template.
         JSONObject template = null;
         try {
-            template = myTowerConnection.getJobTemplate(jobTemplate, templateType);
+            template = myTowerConnection.getJobTemplate(expandedJobTemplate, templateType);
         } catch(AnsibleTowerException e) {
             logger.println("ERROR: Unable to lookup job template " + e.getMessage());
             return false;
@@ -101,7 +113,7 @@ public class AnsibleTowerRunner {
 
 
         if(verbose) {
-            logger.println("Requesting tower to run " + templateType + " template " + jobTemplate);
+            logger.println("Requesting tower to run " + templateType + " template " + expandedJobTemplate);
         }
         int myJobID;
         try {
@@ -116,11 +128,14 @@ public class AnsibleTowerRunner {
 
         logger.println("Template Job URL: "+ jobURL);
 
+        myTowerConnection.setLogTowerEvents(importTowerLogs);
+        myTowerConnection.setJenkinsLogger(logger);
+        myTowerConnection.setRemoveColor(removeColor);
         boolean jobCompleted = false;
         while(!jobCompleted) {
             // First log any events if the user wants them
             try {
-                if (importTowerLogs) { myTowerConnection.logEvents(myJobID, logger, removeColor, templateType, importWorkflowChildLogs); }
+                myTowerConnection.logEvents(myJobID, templateType, importWorkflowChildLogs);
             } catch(AnsibleTowerException e) {
                 logger.println("ERROR: Failed to get job events from tower: "+ e.getMessage());
                 return false;
@@ -136,6 +151,25 @@ public class AnsibleTowerRunner {
                     Thread.sleep(3000);
                 } catch(InterruptedException ie) {
                     logger.println("ERROR: Got interrupted while sleeping");
+                    return false;
+                }
+            }
+        }
+
+        HashMap<String, String> jenkinsVariables = myTowerConnection.getJenkinsExports();
+        for(String key : jenkinsVariables.keySet()) {
+            if(verbose) { logger.println("Recieveing from Jenkins job '"+ key +"' with value '"+ jenkinsVariables.get(key) +"'"); }
+            envVars.put(key, jenkinsVariables.get(key));
+        }
+        if(envVars.size() != 0) {
+            if(Jenkins.getInstance().getPlugin("envinject") == null) {
+                logger.println("Found environment variables to inject but the EnvInject plugin was not found");
+            } else {
+                EnvInjectActionSetter envInjectActionSetter = new EnvInjectActionSetter(ws);
+                try {
+                    envInjectActionSetter.addEnvVarsToRun(run, envVars);
+                } catch(Exception e) {
+                    logger.println("Unable to inject environment variables: " + e.getMessage());
                     return false;
                 }
             }

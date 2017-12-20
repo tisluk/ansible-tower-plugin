@@ -17,6 +17,7 @@ import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.DataBoundSetter;
 
 import javax.annotation.Nonnull;
+import java.io.File;
 
 public class AnsibleTowerStep extends AbstractStepImpl {
     private String towerServer              = "";
@@ -97,7 +98,7 @@ public class AnsibleTowerStep extends AbstractStepImpl {
         return true;
     }
 
-    @Extension
+    @Extension(optional = true)
     public static final class DescriptorImpl extends AbstractStepDescriptorImpl {
         public static final String towerServer              = AnsibleTower.DescriptorImpl.towerServer;
         public static final String jobTemplate              = AnsibleTower.DescriptorImpl.jobTemplate;
@@ -208,7 +209,7 @@ public class AnsibleTowerStep extends AbstractStepImpl {
             boolean runResult = runner.runJobTemplate(
                     listener.getLogger(), step.getTowerServer(), step.getJobTemplate(), extraVars,
                     limit, tags, inventory, credential, verbose, importTowerLogs, removeColor, envVars,
-                    templateType, importWorkflowChildLogs
+                    templateType, importWorkflowChildLogs, ws, run
             );
             if(!runResult) {
                 throw new AbortException("Ansible Tower build step failed");
