@@ -18,6 +18,8 @@ import org.jenkinsci.plugins.envinject.service.EnvInjectActionSetter;
 import java.io.PrintStream;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
+import java.util.Set;
 
 public class AnsibleTowerRunner {
     public boolean runJobTemplate(
@@ -163,11 +165,9 @@ public class AnsibleTowerRunner {
         }
 
         HashMap<String, String> jenkinsVariables = myTowerConnection.getJenkinsExports();
-        Iterator<String> keyIterator = jenkinsVariables.keySet().iterator();
-        while(keyIterator.hasNext()) {
-            String key = keyIterator.next();
-            if(verbose) { logger.println("Recieveing from Jenkins job '"+ key +"' with value '"+ jenkinsVariables.get(key) +"'"); }
-            envVars.put(key, jenkinsVariables.get(key));
+        for(Map.Entry<String, String> entrySet : jenkinsVariables.entrySet()) {
+            if(verbose) { logger.println("Recieveing from Jenkins job '"+ entrySet.getKey() +"' with value '"+ entrySet.getValue() +"'"); }
+            envVars.put(entrySet.getKey(), entrySet.getValue());
         }
         if(envVars.size() != 0) {
             if(Jenkins.getInstance().getPlugin("envinject") == null) {
