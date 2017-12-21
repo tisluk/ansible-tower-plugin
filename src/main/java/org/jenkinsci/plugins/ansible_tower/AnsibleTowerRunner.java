@@ -10,6 +10,7 @@ import hudson.FilePath;
 import hudson.model.Run;
 import jenkins.model.Jenkins;
 import net.sf.json.JSONObject;
+import org.jenkinsci.plugins.ansible_tower.exceptions.AnsibleTowerException;
 import org.jenkinsci.plugins.ansible_tower.util.TowerConnector;
 import org.jenkinsci.plugins.ansible_tower.util.TowerInstallation;
 import org.jenkinsci.plugins.envinject.service.EnvInjectActionSetter;
@@ -122,7 +123,6 @@ public class AnsibleTowerRunner {
         }
         int myJobID;
         try {
-            System.out.println("The template type is "+ templateType);
             myJobID = myTowerConnection.submitTemplate(template.getInt("id"), expandedExtraVars, expandedLimit, expandedJobTags, expandedInventory, expandedCredential, templateType);
         } catch (AnsibleTowerException e) {
             logger.println("ERROR: Unable to request job template invocation " + e.getMessage());

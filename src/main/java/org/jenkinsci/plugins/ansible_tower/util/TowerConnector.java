@@ -5,7 +5,7 @@ package org.jenkinsci.plugins.ansible_tower.util;
  */
 
 import com.google.common.net.HttpHeaders;
-import org.jenkinsci.plugins.ansible_tower.AnsibleTowerException;
+import org.jenkinsci.plugins.ansible_tower.exceptions.AnsibleTowerException;
 
 import java.io.IOException;
 import java.io.PrintStream;
@@ -37,6 +37,7 @@ import org.apache.http.params.HttpParams;
 import org.apache.http.params.HttpProtocolParams;
 import org.apache.http.protocol.HTTP;
 import org.apache.http.util.EntityUtils;
+import org.jenkinsci.plugins.ansible_tower.exceptions.AnsibleTowerItemDoesNotExist;
 
 public class TowerConnector {
     private static final int GET = 1;
@@ -110,7 +111,7 @@ public class TowerConnector {
         return makeRequest(requestType, endpoint, null);
     }
 
-    private HttpResponse makeRequest(int requestType, String endpoint, JSONObject body) throws AnsibleTowerException {
+    private HttpResponse makeRequest(int requestType, String endpoint, JSONObject body) throws AnsibleTowerException, AnsibleTowerItemDoesNotExist {
         // Parse the URL
         URI myURI;
         try {
@@ -158,7 +159,7 @@ public class TowerConnector {
         }
 
         if(response.getStatusLine().getStatusCode() == 404) {
-            throw new AnsibleTowerException("The job id does not exist");
+            throw new AnsibleTowerItemDoesNotExist("The item does not exist");
         } else if(response.getStatusLine().getStatusCode() == 401) {
             throw new AnsibleTowerException("Username/password invalid");
         }
@@ -177,9 +178,20 @@ public class TowerConnector {
         }
     }
 
-    private String convertPotentialStringToID(String idToCheck, String api_endpoint) throws AnsibleTowerException {
+    public String convertPotentialStringToID(String idToCheck, String api_endpoint) throws AnsibleTowerException, AnsibleTowerItemDoesNotExist {
         try {
             Integer.parseInt(idToCheck);
+            // We got an ID so lets see if we can load that item
+            HttpResponse response = makeRequest(GET, api_endpoint + idToCheck +"/");
+            JSONObject responseObject;
+            try {
+                responseObject = JSONObject.fromObject(EntityUtils.toString(response.getEntity()));
+                if(!responseObject.containsKey("id")) {
+                    throw new AnsibleTowerItemDoesNotExist("Did not get an ID back from the request");
+                }
+            } catch (IOException ioe) {
+                throw new AnsibleTowerException(ioe.getMessage());
+            }
             return idToCheck;
         } catch(NumberFormatException nfe) {
             // We were probablly given a name, lets try and resolve the name to an ID
@@ -188,11 +200,11 @@ public class TowerConnector {
             try {
                 responseObject = JSONObject.fromObject(EntityUtils.toString(response.getEntity()));
             } catch (IOException ioe) {
-                throw new AnsibleTowerException("Unable to convert response for templates into json: " + ioe.getMessage());
+                throw new AnsibleTowerException("Unable to convert response for all items into json: " + ioe.getMessage());
             }
             // If we didn't get results, fail
             if(!responseObject.containsKey("results")) {
-                throw new AnsibleTowerException("Response for templates does not contain results");
+                throw new AnsibleTowerException("Response for items does not contain results");
             }
 
             // Start with an invalid id
@@ -211,7 +223,7 @@ public class TowerConnector {
 
             // If we found no name, fail
             if(foundID == -1) {
-                throw new AnsibleTowerException(("Unable to find item named "+ idToCheck));
+                throw new AnsibleTowerItemDoesNotExist("Unable to find item named "+ idToCheck);
             }
 
             // Turn the single jobID we found into the jobTemplate
@@ -232,7 +244,10 @@ public class TowerConnector {
         }
 
         try {
-            jobTemplate = convertPotentialStringToID(jobTemplate,apiEndPoint);
+            jobTemplate = convertPotentialStringToID(jobTemplate, apiEndPoint);
+        } catch(AnsibleTowerItemDoesNotExist atidne) {
+            String ucTemplateType = templateType.replaceFirst(templateType.substring(0,1), templateType.substring(0,1).toUpperCase());
+            throw new AnsibleTowerException(ucTemplateType +" template does not exist in tower");
         } catch(AnsibleTowerException ate) {
             throw new AnsibleTowerException("Unable to find "+ templateType +" template: "+ ate.getMessage());
         }
@@ -267,6 +282,8 @@ public class TowerConnector {
         if(inventory != null && !inventory.isEmpty()) {
             try {
                 inventory = convertPotentialStringToID(inventory, "/api/v1/inventories/");
+            } catch(AnsibleTowerItemDoesNotExist atidne) {
+                throw new AnsibleTowerException("Inventory "+ inventory +" does not exist in tower");
             } catch(AnsibleTowerException ate) {
                 throw new AnsibleTowerException("Unable to find inventory: "+ ate.getMessage());
             }
@@ -275,8 +292,10 @@ public class TowerConnector {
         if(credential != null && !credential.isEmpty()) {
             try {
                 credential = convertPotentialStringToID(credential, "/api/v1/credentials/");
+            } catch(AnsibleTowerItemDoesNotExist ateide) {
+                throw new AnsibleTowerException("Credential "+ credential +" does not exist in tower");
             } catch(AnsibleTowerException ate) {
-                throw new AnsibleTowerException("Unable to find credential: "+ ate.getMessage());
+                throw new AnsibleTowerException("Unable to find credential "+ credential +": "+ ate.getMessage());
             }
             postBody.put("credential", credential);
         }
@@ -307,7 +326,30 @@ public class TowerConnector {
             logger.logMessage(json);
             throw new AnsibleTowerException("Did not get an ID from the request. Template response can be found in the jenkins.log");
         } else if(response.getStatusLine().getStatusCode() == 400) {
-            throw new AnsibleTowerException("Tower recieved a bad request (400 response code). This can happen if your extre vars, credentials, inventory, etc are bad");
+            String json = null;
+            JSONObject responseObject = null;
+            try {
+                json = EntityUtils.toString(response.getEntity());
+                responseObject = JSONObject.fromObject(json);
+            } catch(Exception e) {
+                logger.logMessage("Unable to parse 400 respomnse from json to get details: "+ e.getMessage());
+                logger.logMessage(json);
+            }
+
+            /*
+                Types of things that might come back:
+                {"extra_vars":["Must be valid JSON or YAML."],"variables_needed_to_start":["'my_var' value missing"]}
+                {"credential":["Invalid pk \"999999\" - object does not exist."]}
+                {"inventory":["Invalid pk \"99999999\" - object does not exist."]}
+
+                Note: we are only testing for extra_vars as the other items should be checked during convertPotentialStringToID
+            */
+
+            if(responseObject != null && responseObject.containsKey("extra_vars")) {
+                throw new AnsibleTowerException("Extra vars are bad: "+ responseObject.getString("extra_vars"));
+            } else {
+                throw new AnsibleTowerException("Tower recieved a bad request (400 response code)\n" + json);
+            }
         } else {
             throw new AnsibleTowerException("Unexpected error code returned ("+ response.getStatusLine().getStatusCode() +")");
         }
