@@ -17,6 +17,7 @@ import org.jenkinsci.plugins.envinject.service.EnvInjectActionSetter;
 
 import java.io.PrintStream;
 import java.util.HashMap;
+import java.util.Iterator;
 
 public class AnsibleTowerRunner {
     public boolean runJobTemplate(
@@ -162,7 +163,9 @@ public class AnsibleTowerRunner {
         }
 
         HashMap<String, String> jenkinsVariables = myTowerConnection.getJenkinsExports();
-        for(String key : jenkinsVariables.keySet()) {
+        Iterator<String> keyIterator = jenkinsVariables.keySet().iterator();
+        while(keyIterator.hasNext()) {
+            String key = keyIterator.next();
             if(verbose) { logger.println("Recieveing from Jenkins job '"+ key +"' with value '"+ jenkinsVariables.get(key) +"'"); }
             envVars.put(key, jenkinsVariables.get(key));
         }
