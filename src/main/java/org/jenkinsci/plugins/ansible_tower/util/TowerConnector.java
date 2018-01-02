@@ -44,7 +44,7 @@ public class TowerConnector {
     private static final int POST = 2;
     public static final String JOB_TEMPLATE_TYPE = "job";
     public static final String WORKFLOW_TEMPLATE_TYPE = "workflow";
-    private final String ARTIFACTS = "artifacts";
+    private static final String ARTIFACTS = "artifacts";
 
     private String url = null;
     private String username = null;
