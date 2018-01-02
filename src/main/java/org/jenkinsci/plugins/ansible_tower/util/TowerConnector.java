@@ -5,6 +5,7 @@ package org.jenkinsci.plugins.ansible_tower.util;
  */
 
 import com.google.common.net.HttpHeaders;
+import net.sf.json.JSONArray;
 import org.jenkinsci.plugins.ansible_tower.exceptions.AnsibleTowerException;
 
 import java.io.IOException;
@@ -13,8 +14,7 @@ import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.security.KeyStore;
-import java.util.HashMap;
-import java.util.Vector;
+import java.util.*;
 
 import net.sf.json.JSONObject;
 import org.apache.commons.codec.binary.Base64;
@@ -44,6 +44,7 @@ public class TowerConnector {
     private static final int POST = 2;
     public static final String JOB_TEMPLATE_TYPE = "job";
     public static final String WORKFLOW_TEMPLATE_TYPE = "workflow";
+    private final String ARTIFACTS = "artifacts";
 
     private String url = null;
     private String username = null;
@@ -58,14 +59,16 @@ public class TowerConnector {
     private HashMap<String, String> jenkinsExports = new HashMap<String, String>();
 
     public TowerConnector(String url, String username, String password) {
-        this(url, username, password, false);
+        this(url, username, password, false, false);
     }
 
-    public TowerConnector(String url, String username, String password, Boolean trustAllCerts) {
+    public TowerConnector(String url, String username, String password, Boolean trustAllCerts, Boolean debug) {
         this.url = url;
         this.username = username;
         this.password = password;
         this.trustAllCerts = trustAllCerts;
+        this.setDebug(debug);
+        logger.logMessage("Creating a test connector with "+ username +"@"+ url);
     }
 
     public void setTrustAllCerts(boolean trustAllCerts) {
@@ -176,6 +179,7 @@ public class TowerConnector {
         if(response.getStatusLine().getStatusCode() != 200) {
             throw new AnsibleTowerException("Unexpected error code returned from test connection ("+ response.getStatusLine().getStatusCode() +")");
         }
+        logger.logMessage("Connection successfully tested");
     }
 
     public String convertPotentialStringToID(String idToCheck, String api_endpoint) throws AnsibleTowerException, AnsibleTowerItemDoesNotExist {
@@ -383,6 +387,23 @@ public class TowerConnector {
                 if(finished == null || finished.equalsIgnoreCase("null")) {
                     return false;
                 } else {
+                    // Since we were finished we will now also check for stats
+                    if(responseObject.containsKey(ARTIFACTS)) {
+                        logger.logMessage("Processing artifacts");
+                        JSONObject artifacts = responseObject.getJSONObject(ARTIFACTS);
+                        if(artifacts.containsKey("JENKINS_EXPORT")) {
+                            JSONArray exportVariables = artifacts.getJSONArray("JENKINS_EXPORT");
+                            Iterator<JSONObject> listIterator = exportVariables.iterator();
+                            while(listIterator.hasNext()) {
+                                JSONObject entry = listIterator.next();
+                                Iterator<String> keyIterator = entry.keys();
+                                while(keyIterator.hasNext()) {
+                                    String key = keyIterator.next();
+                                    jenkinsExports.put(key, entry.getString(key));
+                                }
+                            }
+                        }
+                    }
                     return true;
                 }
             }
@@ -478,19 +499,24 @@ public class TowerConnector {
         for(String line : lines) {
             if(removeColor) {
                 // This regex was found on https://stackoverflow.com/questions/14652538/remove-ascii-color-codes
-                line = line.replaceAll("\u001B\\[[;\\d]*m", "");
+                line = removeColor(line);
             }
             if(logTowerEvents) {
                 jenkinsLogger.println(line);
             }
             // Even if we don't log, we are going to see if this line contains the string JENKINS_EXPORT VAR=value
             if(line.matches("^.*JENKINS_EXPORT.*$")) {
-                String[] entities = line.split("=", 2);
+                // The value might have some ansi color on it so we need to force the removal  of it
+                String[] entities = removeColor(line).split("=", 2);
                 entities[0] = entities[0].replaceAll(".*JENKINS_EXPORT ", "");
                 entities[1] = entities[1].replaceAll("\"$", "");
                 jenkinsExports.put( entities[0], entities[1]);
             }
         }
+    }
+
+    private String removeColor(String coloredLine) {
+        return coloredLine.replaceAll("\u001B\\[[;\\d]*m", "");
     }
 
 

@@ -30,25 +30,28 @@ public class TowerInstallation extends AbstractDescribableImpl<TowerInstallation
     private final String towerURL;
     private final String towerCredentialsId;
     private final boolean towerTrustCert;
+    private final boolean enableDebugging;
 
     @DataBoundConstructor
-    public TowerInstallation(String towerDisplayName, String towerURL, String towerCredentialsId, boolean towerTrustCert) {
+    public TowerInstallation(String towerDisplayName, String towerURL, String towerCredentialsId, boolean towerTrustCert, boolean enableDebugging) {
         this.towerDisplayName = towerDisplayName;
         this.towerCredentialsId = towerCredentialsId;
         this.towerURL = towerURL;
         this.towerTrustCert = towerTrustCert;
+        this.enableDebugging = enableDebugging;
     }
 
     public String getTowerDisplayName() { return this.towerDisplayName; }
     public String getTowerURL() { return this.towerURL; }
     public String getTowerCredentialsId() { return this.towerCredentialsId; }
     public boolean getTowerTrustCert() { return this.towerTrustCert; }
+    public boolean getEnableDebugging() { return this.enableDebugging; }
 
     public TowerConnector getTowerConnector() {
-        return TowerInstallation.getTowerConnecorStatic(this.towerURL, this.towerCredentialsId, this.towerTrustCert);
+        return TowerInstallation.getTowerConnectorStatic(this.towerURL, this.towerCredentialsId, this.towerTrustCert, this.enableDebugging);
     }
 
-    public static TowerConnector getTowerConnecorStatic(String towerURL, String towerCredentialsId, boolean trustCert) {
+    public static TowerConnector getTowerConnectorStatic(String towerURL, String towerCredentialsId, boolean trustCert, boolean enableDebugging) {
         String username = null;
         String password = null;
         if(StringUtils.isNotBlank(towerCredentialsId)) {
@@ -60,8 +63,7 @@ public class TowerInstallation extends AbstractDescribableImpl<TowerInstallation
                 }
             }
         }
-        TowerLogger.writeMessage("Creating a test connector with "+ username +"@"+ towerURL);
-        TowerConnector testConnector = new TowerConnector(towerURL, username, password, trustCert);
+        TowerConnector testConnector = new TowerConnector(towerURL, username, password, trustCert, enableDebugging);
         return testConnector;
     }
 
@@ -71,10 +73,11 @@ public class TowerInstallation extends AbstractDescribableImpl<TowerInstallation
         public FormValidation doTestTowerConnection(
                 @QueryParameter("towerURL") final String towerURL,
                 @QueryParameter("towerCredentialsId") final String towerCredentialsId,
-                @QueryParameter("towerTrustCert") final boolean towerTrustCert
+                @QueryParameter("towerTrustCert") final boolean towerTrustCert,
+                @QueryParameter("enableDebugging") final boolean enableDebugging
         ) {
-            TowerLogger.writeMessage("Starting to test connection with ("+ towerURL +") and ("+ towerCredentialsId +") and ("+ towerTrustCert +")");
-            TowerConnector testConnector = TowerInstallation.getTowerConnecorStatic(towerURL, towerCredentialsId, towerTrustCert);
+            TowerLogger.writeMessage("Starting to test connection with ("+ towerURL +") and ("+ towerCredentialsId +") and ("+ towerTrustCert +") with debugging ("+ enableDebugging +")");
+            TowerConnector testConnector = TowerInstallation.getTowerConnectorStatic(towerURL, towerCredentialsId, towerTrustCert, enableDebugging);
             try {
                 testConnector.testConnection();
                 return FormValidation.ok("Success");
