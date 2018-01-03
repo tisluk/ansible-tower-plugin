@@ -365,7 +365,7 @@ public class TowerConnector {
         throw new AnsibleTowerException("Template type can only be '"+ JOB_TEMPLATE_TYPE +"' or '"+ WORKFLOW_TEMPLATE_TYPE+"'");
     }
 
-    public boolean isJobCommpleted(int jobID, String templateType) throws AnsibleTowerException {
+    public boolean isJobCompleted(int jobID, String templateType) throws AnsibleTowerException {
         checkTemplateType(templateType);
 
         String apiEndpoint = "/api/v1/jobs/"+ jobID +"/";
@@ -414,6 +414,14 @@ public class TowerConnector {
         }
     }
 
+    /**
+     * @deprecated
+     * Use isJobCompleted
+     */
+    @Deprecated
+    public boolean isJobCommpleted(int jobID, String templateType) throws AnsibleTowerException {
+        return isJobCompleted(jobID, templateType);
+    }
 
     public void logEvents(int jobID, String templateType, boolean importWorkflowChildLogs) throws AnsibleTowerException {
         checkTemplateType(templateType);

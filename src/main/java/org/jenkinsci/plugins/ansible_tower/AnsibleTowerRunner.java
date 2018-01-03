@@ -149,7 +149,7 @@ public class AnsibleTowerRunner {
                 return false;
             }
             try {
-                jobCompleted = myTowerConnection.isJobCommpleted(myJobID, templateType);
+                jobCompleted = myTowerConnection.isJobCompleted(myJobID, templateType);
             } catch(AnsibleTowerException e) {
                 logger.println("ERROR: Failed to get job status from Tower: "+ e.getMessage());
                 return false;
