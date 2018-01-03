@@ -352,7 +352,7 @@ public class TowerConnector {
             if(responseObject != null && responseObject.containsKey("extra_vars")) {
                 throw new AnsibleTowerException("Extra vars are bad: "+ responseObject.getString("extra_vars"));
             } else {
-                throw new AnsibleTowerException("Tower recieved a bad request (400 response code)\n" + json);
+                throw new AnsibleTowerException("Tower received a bad request (400 response code)\n" + json);
             }
         } else {
             throw new AnsibleTowerException("Unexpected error code returned ("+ response.getStatusLine().getStatusCode() +")");
