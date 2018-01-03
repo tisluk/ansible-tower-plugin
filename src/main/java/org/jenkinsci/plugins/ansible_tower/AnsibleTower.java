@@ -1,7 +1,7 @@
 package org.jenkinsci.plugins.ansible_tower;
 
 /*
-        This calss is the standard workflow step
+        This class is the standard workflow step
         We simply take the data from Jenkins and call an AnsibleTowerRunner
  */
 
