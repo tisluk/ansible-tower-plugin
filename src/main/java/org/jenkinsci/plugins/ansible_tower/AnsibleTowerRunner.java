@@ -185,7 +185,7 @@ public class AnsibleTowerRunner {
 
         try {
             if(myTowerConnection.isJobFailed(myJobID, templateType)) {
-                logger.println("Tower failed to complete the requeted job");
+                logger.println("Tower failed to complete the requested job");
                 return false;
             } else {
                 if(verbose) { logger.println("Tower completed the requested job"); }
