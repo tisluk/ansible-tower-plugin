@@ -166,7 +166,7 @@ public class AnsibleTowerRunner {
 
         HashMap<String, String> jenkinsVariables = myTowerConnection.getJenkinsExports();
         for(Map.Entry<String, String> entrySet : jenkinsVariables.entrySet()) {
-            if(verbose) { logger.println("Recieveing from Jenkins job '"+ entrySet.getKey() +"' with value '"+ entrySet.getValue() +"'"); }
+            if(verbose) { logger.println("Receiving from Jenkins job '"+ entrySet.getKey() +"' with value '"+ entrySet.getValue() +"'"); }
             envVars.put(entrySet.getKey(), entrySet.getValue());
         }
         if(envVars.size() != 0) {
