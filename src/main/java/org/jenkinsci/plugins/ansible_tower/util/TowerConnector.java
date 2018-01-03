@@ -336,7 +336,7 @@ public class TowerConnector {
                 json = EntityUtils.toString(response.getEntity());
                 responseObject = JSONObject.fromObject(json);
             } catch(Exception e) {
-                logger.logMessage("Unable to parse 400 respomnse from json to get details: "+ e.getMessage());
+                logger.logMessage("Unable to parse 400 response from json to get details: "+ e.getMessage());
                 logger.logMessage(json);
             }
 
