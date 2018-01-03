@@ -198,7 +198,7 @@ public class TowerConnector {
             }
             return idToCheck;
         } catch(NumberFormatException nfe) {
-            // We were probablly given a name, lets try and resolve the name to an ID
+            // We were probably given a name, lets try and resolve the name to an ID
             HttpResponse response = makeRequest(GET, api_endpoint);
             JSONObject responseObject;
             try {
