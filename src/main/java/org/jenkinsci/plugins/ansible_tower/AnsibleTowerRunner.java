@@ -99,19 +99,19 @@ public class AnsibleTowerRunner {
         }
 
 
-        if(expandedExtraVars != null && template.containsKey("ask_variables_on_launch") && template.getBoolean("ask_variables_on_launch")) {
+        if(expandedExtraVars != null && template.containsKey("ask_variables_on_launch") && !template.getBoolean("ask_variables_on_launch")) {
             logger.println("[WARNING]: Extra variables defined but prompt for variables on launch is not set in tower job");
         }
-        if(expandedLimit != null && template.containsKey("ask_limit_on_launch") && template.getBoolean("ask_limit_on_launch")) {
+        if(expandedLimit != null && template.containsKey("ask_limit_on_launch") && !template.getBoolean("ask_limit_on_launch")) {
             logger.println("[WARNING]: Limit defined but prompt for limit on launch is not set in tower job");
         }
-        if(expandedJobTags != null && template.containsKey("ask_tags_on_launch") && template.getBoolean("ask_tags_on_launch")) {
+        if(expandedJobTags != null && template.containsKey("ask_tags_on_launch") && !template.getBoolean("ask_tags_on_launch")) {
             logger.println("[WARNING]: Job Tags defined but prompt for tags on launch is not set in tower job");
         }
-        if(expandedInventory != null && template.containsKey("ask_inventory_on_launch") && template.getBoolean("ask_inventory_on_launch")) {
+        if(expandedInventory != null && template.containsKey("ask_inventory_on_launch") && !template.getBoolean("ask_inventory_on_launch")) {
             logger.println("[WARNING]: Inventory defined but prompt for inventory on launch is not set in tower job");
         }
-        if(expandedCredential != null && template.containsKey("ask_credential_on_launch") && template.getBoolean("ask_credential_on_launch")) {
+        if(expandedCredential != null && template.containsKey("ask_credential_on_launch") && !template.getBoolean("ask_credential_on_launch")) {
             logger.println("[WARNING]: Credential defined but prompt for credential on launch is not set in tower job");
         }
         // Here are some more options we may want to use someday
