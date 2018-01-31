@@ -163,6 +163,12 @@ public class AnsibleTowerRunner {
                 }
             }
         }
+        try {
+            myTowerConnection.logEvents(myJobID, templateType, importWorkflowChildLogs);
+        } catch(AnsibleTowerException e) {
+            logger.println("ERROR: Failed to get job events from tower: "+ e.getMessage());
+            return false;
+        }
 
         HashMap<String, String> jenkinsVariables = myTowerConnection.getJenkinsExports();
         for(Map.Entry<String, String> entrySet : jenkinsVariables.entrySet()) {
