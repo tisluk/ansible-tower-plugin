@@ -46,6 +46,7 @@ public class TowerConnector {
     public static final String WORKFLOW_TEMPLATE_TYPE = "workflow";
     private static final String ARTIFACTS = "artifacts";
 
+    private String authToken = null;
     private String url = null;
     private String username = null;
     private String password = null;
@@ -145,12 +146,13 @@ public class TowerConnector {
         }
 
 
-        if(this.username != null || this.password != null) {
-            logger.logMessage("Adding auth for "+ this.username);
-            String auth = this.username + ":" + this.password;
-            byte[] encodedAuth = Base64.encodeBase64(auth.getBytes(Charset.forName("UTF-8")));
-            String authHeader = "Basic " + new String(encodedAuth, Charset.forName("UTF-8"));
-            request.setHeader(HttpHeaders.AUTHORIZATION, authHeader);
+        if((this.username != null || this.password != null) && this.authToken == null) {
+            logger.logMessage("Adding basic auth for "+ this.username);
+            this.authToken = getAuthToken();
+        }
+        if(this.authToken != null) {
+            logger.logMessage("Adding token auth for "+ this.username);
+            request.setHeader("Authorization", "Token "+ this.authToken);
         }
 
         DefaultHttpClient httpClient = getHttpClient();
@@ -634,5 +636,56 @@ public class TowerConnector {
         }
         returnURL += "/"+ myJobID;
         return returnURL;
+    }
+
+    private String getAuthToken() throws AnsibleTowerException {
+        logger.logMessage("Adding auth for "+ this.username);
+        String auth = this.username + ":" + this.password;
+        byte[] encodedAuth = Base64.encodeBase64(auth.getBytes(Charset.forName("UTF-8")));
+        String authHeader = "Basic " + new String(encodedAuth, Charset.forName("UTF-8"));
+
+        String tokenURI = url + "/api/v1/authtoken/";
+        HttpPost tokenRequest = new HttpPost(tokenURI);
+        tokenRequest.setHeader(HttpHeaders.AUTHORIZATION, authHeader);
+        JSONObject body = new JSONObject();
+        body.put("username", this.username);
+        body.put("password", this.password);
+        try {
+            StringEntity bodyEntity = new StringEntity(body.toString());
+            tokenRequest.setEntity(bodyEntity);
+        } catch(UnsupportedEncodingException uee) {
+            throw new AnsibleTowerException("Unable to encode body as JSON: "+ uee.getMessage());
+        }
+
+        tokenRequest.setHeader("Content-Type", "application/json");
+
+        DefaultHttpClient httpClient = getHttpClient();
+        HttpResponse response;
+        try {
+            response = httpClient.execute(tokenRequest);
+        } catch(Exception e) {
+            throw new AnsibleTowerException("Unable to make tower request for authtoken: "+ e.getMessage());
+        }
+
+        if(response.getStatusLine().getStatusCode() == 400) {
+            throw new AnsibleTowerException("Username/password invalid");
+        } else if(response.getStatusLine().getStatusCode() != 200) {
+            throw new AnsibleTowerException("Unable to get auth token");
+        }
+
+        JSONObject responseObject;
+        String json;
+        try {
+            json = EntityUtils.toString(response.getEntity());
+            responseObject = JSONObject.fromObject(json);
+        } catch (IOException ioe) {
+            throw new AnsibleTowerException("Unable to read response and convert it into json: " + ioe.getMessage());
+        }
+
+        if (responseObject.containsKey("token")) {
+            return responseObject.getString("token");
+        }
+        logger.logMessage(json);
+        throw new AnsibleTowerException("Did not get a token from the request. Template response can be found in the jenkins.log");
     }
 }
