@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.nio.charset.Charset;
 import java.security.KeyStore;
 import java.util.*;
@@ -200,8 +201,14 @@ public class TowerConnector {
             }
             return idToCheck;
         } catch(NumberFormatException nfe) {
-            // We were probablly given a name, lets try and resolve the name to an ID
-            HttpResponse response = makeRequest(GET, api_endpoint);
+            HttpResponse response = null;
+            try {
+                // We were probablly given a name, lets try and resolve the name to an ID
+                logger.logMessage(api_endpoint + "?name=" + URLEncoder.encode(idToCheck, "UTF-8")));
+                response = makeRequest(GET, api_endpoint + "?name=" + URLEncoder.encode(idToCheck, "UTF-8"));
+            } catch(Exception e) {
+                throw new AnsibleTowerException("Unable to encode item name for lookup");
+            }
             JSONObject responseObject;
             try {
                 responseObject = JSONObject.fromObject(EntityUtils.toString(response.getEntity()));
@@ -213,29 +220,17 @@ public class TowerConnector {
                 throw new AnsibleTowerException("Response for items does not contain results");
             }
 
-            // Start with an invalid id
-            int foundID = -1;
             // Loop over the results, if one of the items has the name copy its ID
             // If there are more than one job with the same name, fail
-            for(Object returnedItem : responseObject.getJSONArray("results")) {
-                if(((JSONObject) returnedItem).getString("name").equals(idToCheck)) {
-                    if(foundID != -1) {
-                        throw new AnsibleTowerException("The item "+ idToCheck +" is not unique");
-                    } else {
-                        foundID = ((JSONObject) returnedItem).getInt("id");
-                    }
-                }
+            if(responseObject.getInt("count") == 0) {
+                throw new AnsibleTowerException("Unable to get any results when looking up "+ idToCheck);
+            } else if(responseObject.getInt("count") > 1) {
+                throw new AnsibleTowerException("The item "+ idToCheck +" is not unique");
+            } else {
+                JSONObject foundItem = (JSONObject) responseObject.getJSONArray("results").get(0);
+                return foundItem.getString("id");
             }
-
-            // If we found no name, fail
-            if(foundID == -1) {
-                throw new AnsibleTowerItemDoesNotExist("Unable to find item named "+ idToCheck);
-            }
-
-            // Turn the single jobID we found into the jobTemplate
-            return ""+ foundID;
         }
-
     }
 
     public JSONObject getJobTemplate(String jobTemplate, String templateType) throws AnsibleTowerException {
