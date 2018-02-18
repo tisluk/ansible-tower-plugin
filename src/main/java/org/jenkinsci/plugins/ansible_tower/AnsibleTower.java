@@ -1,7 +1,7 @@
 package org.jenkinsci.plugins.ansible_tower;
 
 /*
-        This calss is the standard workflow step
+        This class is the standard workflow step
         We simply take the data from Jenkins and call an AnsibleTowerRunner
  */
 
@@ -172,7 +172,7 @@ public class AnsibleTower extends Builder {
         	return items;
 		}
 
-        // Some day I'd like to be able to make all of these dropdowns from quering the tower API
+        // Some day I'd like to be able to make all of these dropdowns from querying the tower API
 		// Maybe not in real time because that would be slow when loading a the configure job
         /*
         public ListBoxModel doFillPlaybookItems() {

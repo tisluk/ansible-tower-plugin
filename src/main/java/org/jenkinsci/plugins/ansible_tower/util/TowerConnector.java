@@ -202,13 +202,15 @@ public class TowerConnector {
             }
             return idToCheck;
         } catch(NumberFormatException nfe) {
+
             HttpResponse response = null;
             try {
-                // We were probablly given a name, lets try and resolve the name to an ID
+                // We were probably given a name, lets try and resolve the name to an ID
                 response = makeRequest(GET, api_endpoint + "?name=" + URLEncoder.encode(idToCheck, "UTF-8"));
             } catch(Exception e) {
                 throw new AnsibleTowerException("Unable to encode item name for lookup");
             }
+
             JSONObject responseObject;
             try {
                 responseObject = JSONObject.fromObject(EntityUtils.toString(response.getEntity()));
@@ -333,7 +335,7 @@ public class TowerConnector {
                 json = EntityUtils.toString(response.getEntity());
                 responseObject = JSONObject.fromObject(json);
             } catch(Exception e) {
-                logger.logMessage("Unable to parse 400 respomnse from json to get details: "+ e.getMessage());
+                logger.logMessage("Unable to parse 400 response from json to get details: "+ e.getMessage());
                 logger.logMessage(json);
             }
 
@@ -349,7 +351,7 @@ public class TowerConnector {
             if(responseObject != null && responseObject.containsKey("extra_vars")) {
                 throw new AnsibleTowerException("Extra vars are bad: "+ responseObject.getString("extra_vars"));
             } else {
-                throw new AnsibleTowerException("Tower recieved a bad request (400 response code)\n" + json);
+                throw new AnsibleTowerException("Tower received a bad request (400 response code)\n" + json);
             }
         } else {
             throw new AnsibleTowerException("Unexpected error code returned ("+ response.getStatusLine().getStatusCode() +")");
@@ -362,7 +364,7 @@ public class TowerConnector {
         throw new AnsibleTowerException("Template type can only be '"+ JOB_TEMPLATE_TYPE +"' or '"+ WORKFLOW_TEMPLATE_TYPE+"'");
     }
 
-    public boolean isJobCommpleted(int jobID, String templateType) throws AnsibleTowerException {
+    public boolean isJobCompleted(int jobID, String templateType) throws AnsibleTowerException {
         checkTemplateType(templateType);
 
         String apiEndpoint = "/api/v1/jobs/"+ jobID +"/";
@@ -411,6 +413,14 @@ public class TowerConnector {
         }
     }
 
+    /**
+     * @deprecated
+     * Use isJobCompleted
+     */
+    @Deprecated
+    public boolean isJobCommpleted(int jobID, String templateType) throws AnsibleTowerException {
+        return isJobCompleted(jobID, templateType);
+    }
 
     public void logEvents(int jobID, String templateType, boolean importWorkflowChildLogs) throws AnsibleTowerException {
         checkTemplateType(templateType);

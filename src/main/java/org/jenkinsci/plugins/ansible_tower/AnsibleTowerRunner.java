@@ -149,7 +149,7 @@ public class AnsibleTowerRunner {
                 return false;
             }
             try {
-                jobCompleted = myTowerConnection.isJobCommpleted(myJobID, templateType);
+                jobCompleted = myTowerConnection.isJobCompleted(myJobID, templateType);
             } catch(AnsibleTowerException e) {
                 logger.println("ERROR: Failed to get job status from Tower: "+ e.getMessage());
                 return false;
@@ -166,7 +166,7 @@ public class AnsibleTowerRunner {
 
         HashMap<String, String> jenkinsVariables = myTowerConnection.getJenkinsExports();
         for(Map.Entry<String, String> entrySet : jenkinsVariables.entrySet()) {
-            if(verbose) { logger.println("Recieveing from Jenkins job '"+ entrySet.getKey() +"' with value '"+ entrySet.getValue() +"'"); }
+            if(verbose) { logger.println("Receiving from Jenkins job '"+ entrySet.getKey() +"' with value '"+ entrySet.getValue() +"'"); }
             envVars.put(entrySet.getKey(), entrySet.getValue());
         }
         if(envVars.size() != 0) {
@@ -185,7 +185,7 @@ public class AnsibleTowerRunner {
 
         try {
             if(myTowerConnection.isJobFailed(myJobID, templateType)) {
-                logger.println("Tower failed to complete the requeted job");
+                logger.println("Tower failed to complete the requested job");
                 return false;
             } else {
                 if(verbose) { logger.println("Tower completed the requested job"); }
