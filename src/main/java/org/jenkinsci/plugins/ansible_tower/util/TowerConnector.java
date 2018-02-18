@@ -207,7 +207,7 @@ public class TowerConnector {
             try {
                 // We were probably given a name, lets try and resolve the name to an ID
                 response = makeRequest(GET, api_endpoint + "?name=" + URLEncoder.encode(idToCheck, "UTF-8"));
-            } catch(Exception e) {
+            } catch(UnsupportedEncodingException e) {
                 throw new AnsibleTowerException("Unable to encode item name for lookup");
             }
 
@@ -583,7 +583,7 @@ public class TowerConnector {
     }
 
     private void logJobEvents(int jobID) throws AnsibleTowerException {
-        if(!this.logIdForJobs.containsKey("jobID")) { this.logIdForJobs.put(jobID, 0); }
+        if(!this.logIdForJobs.containsKey(jobID)) { this.logIdForJobs.put(jobID, 0); }
         boolean keepChecking = true;
         while(keepChecking) {
             String apiURL = "/api/v1/jobs/" + jobID + "/job_events/?id__gt="+ this.logIdForJobs.get(jobID);
