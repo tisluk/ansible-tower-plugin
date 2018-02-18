@@ -166,7 +166,7 @@ public class AnsibleTowerRunner {
         try {
             myTowerConnection.logEvents(myJobID, templateType, importWorkflowChildLogs);
         } catch(AnsibleTowerException e) {
-            logger.println("ERROR: Failed to get job events from tower: "+ e.getMessage());
+            logger.println("ERROR: Failed to get final job events from tower: "+ e.getMessage());
             return false;
         }
 
