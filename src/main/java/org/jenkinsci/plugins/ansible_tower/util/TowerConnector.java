@@ -53,8 +53,9 @@ public class TowerConnector {
     private String password = null;
     private boolean trustAllCerts = true;
     private TowerLogger logger = new TowerLogger();
-    private Vector<Integer> displayedEvents = new Vector<Integer>();
-    private Vector<Integer> displayedWorkflowNode = new Vector<Integer>();
+    HashMap<Integer, Integer> logIdForWorkflows = new HashMap<Integer, Integer>();
+    HashMap<Integer, Integer> logIdForJobs = new HashMap<Integer, Integer>();
+
     private boolean logTowerEvents = false;
     private PrintStream jenkinsLogger = null;
     private boolean removeColor = true;
@@ -204,7 +205,6 @@ public class TowerConnector {
             HttpResponse response = null;
             try {
                 // We were probablly given a name, lets try and resolve the name to an ID
-                logger.logMessage(api_endpoint + "?name=" + URLEncoder.encode(idToCheck, "UTF-8")));
                 response = makeRequest(GET, api_endpoint + "?name=" + URLEncoder.encode(idToCheck, "UTF-8"));
             } catch(Exception e) {
                 throw new AnsibleTowerException("Unable to encode item name for lookup");
@@ -253,7 +253,7 @@ public class TowerConnector {
             throw new AnsibleTowerException("Unable to find "+ templateType +" template: "+ ate.getMessage());
         }
 
-        // Now get the job template to we can check the options being passed in
+        // Now get the job template so we can check the options being passed in
         HttpResponse response = makeRequest(GET, apiEndPoint + jobTemplate + "/");
         if (response.getStatusLine().getStatusCode() != 200) {
             throw new AnsibleTowerException("Unexpected error code returned when getting template (" + response.getStatusLine().getStatusCode() + ")");
@@ -427,7 +427,8 @@ public class TowerConnector {
     private static String UNIFIED_JOB_TEMPLATE = "unified_job_template";
 
     private void logWorkflowEvents(int jobID, boolean importWorkflowChildLogs) throws AnsibleTowerException {
-        HttpResponse response = makeRequest(GET, "/api/v1/workflow_jobs/"+ jobID +"/workflow_nodes/");
+        if(!this.logIdForWorkflows.containsKey(jobID)) { this.logIdForWorkflows.put(jobID, 0); }
+        HttpResponse response = makeRequest(GET, "/api/v1/workflow_jobs/"+ jobID +"/workflow_nodes/?id__gt="+this.logIdForWorkflows.get(jobID));
 
         if(response.getStatusLine().getStatusCode() == 200) {
             JSONObject responseObject;
@@ -445,7 +446,6 @@ public class TowerConnector {
                 for(Object anEventObject : responseObject.getJSONArray("results")) {
                     JSONObject anEvent = (JSONObject) anEventObject;
                     Integer eventId = anEvent.getInt("id");
-                    if(displayedWorkflowNode.contains(eventId)) { continue; }
 
                     if(!anEvent.containsKey("summary_fields")) { continue; }
 
@@ -462,10 +462,16 @@ public class TowerConnector {
                             job.getString("status").equalsIgnoreCase("running") ||
                             job.getString("status").equalsIgnoreCase("pending")
                     ) {
-                        continue;
+                        // Here we want to return. Otherwise we might "loose" things.
+                        // For example, say there are three nodes in the pipeline.
+                        // Node 1 takes a long time, Node 2 which runs in parallel is quick
+                        // If Node 2 executes second and completed we will use the ID of node 2 as the next ID.
+                        // Node 1 results will be lost because node 2 has already finished.
+                        // Returning will prevent this from happening.
+                        return;
                     }
 
-                    displayedWorkflowNode.add(eventId);
+                    if(eventId > this.logIdForWorkflows.get(jobID)) { this.logIdForWorkflows.put(jobID, eventId); }
                     jenkinsLogger.println(job.getString("name") +" => "+ job.getString("status") +" "+ this.getJobURL(job.getInt("id"), JOB_TEMPLATE_TYPE));
 
                     if(importWorkflowChildLogs) {
@@ -518,6 +524,7 @@ public class TowerConnector {
 
 
     private void logInventorySync(int syncID) throws AnsibleTowerException {
+        // These are not normal logs, so we don't need to paginate
         String apiURL = "/api/v1/inventory_updates/"+ syncID +"/";
         HttpResponse response = makeRequest(GET, apiURL);
         if(response.getStatusLine().getStatusCode() == 200) {
@@ -542,6 +549,7 @@ public class TowerConnector {
 
 
     private void logProjectSync(int syncID) throws AnsibleTowerException {
+        // These are not normal logs, so we don't need to paginate
         String apiURL = "/api/v1/project_updates/"+ syncID +"/";
         HttpResponse response = makeRequest(GET, apiURL);
         if(response.getStatusLine().getStatusCode() == 200) {
@@ -565,33 +573,40 @@ public class TowerConnector {
     }
 
     private void logJobEvents(int jobID) throws AnsibleTowerException {
-        String apiURL = "/api/v1/jobs/" + jobID + "/job_events/";
-        HttpResponse response = makeRequest(GET, apiURL);
+        if(!this.logIdForJobs.containsKey("jobID")) { this.logIdForJobs.put(jobID, 0); }
+        boolean keepChecking = true;
+        while(keepChecking) {
+            String apiURL = "/api/v1/jobs/" + jobID + "/job_events/?id__gt="+ this.logIdForJobs.get(jobID);
+            HttpResponse response = makeRequest(GET, apiURL);
 
-        if(response.getStatusLine().getStatusCode() == 200) {
-            JSONObject responseObject;
-            String json;
-            try {
-                json = EntityUtils.toString(response.getEntity());
-                responseObject = JSONObject.fromObject(json);
-            } catch(IOException ioe) {
-                throw new AnsibleTowerException("Unable to read response and convert it into json: "+ ioe.getMessage());
-            }
+            if (response.getStatusLine().getStatusCode() == 200) {
+                JSONObject responseObject;
+                String json;
+                try {
+                    json = EntityUtils.toString(response.getEntity());
+                    responseObject = JSONObject.fromObject(json);
+                } catch (IOException ioe) {
+                    throw new AnsibleTowerException("Unable to read response and convert it into json: " + ioe.getMessage());
+                }
 
-            logger.logMessage(json);
+                logger.logMessage(json);
 
-            if(responseObject.containsKey("results")) {
-                for(Object anEvent : responseObject.getJSONArray("results")) {
-                    Integer eventId = ((JSONObject) anEvent).getInt("id");
-                    String stdOut = ((JSONObject) anEvent).getString("stdout");
-                    if(!displayedEvents.contains(eventId)) {
-                        displayedEvents.add(eventId);
+                if(responseObject.containsKey("next") && responseObject.getString("next") == null || responseObject.getString("next").equalsIgnoreCase("null")) {
+                    keepChecking = false;
+                }
+                if (responseObject.containsKey("results")) {
+                    for (Object anEvent : responseObject.getJSONArray("results")) {
+                        Integer eventId = ((JSONObject) anEvent).getInt("id");
+                        String stdOut = ((JSONObject) anEvent).getString("stdout");
                         logLine(stdOut);
+                        if (eventId > this.logIdForJobs.get(jobID)) {
+                            this.logIdForJobs.put(jobID, eventId);
+                        }
                     }
                 }
+            } else {
+                throw new AnsibleTowerException("Unexpected error code returned (" + response.getStatusLine().getStatusCode() + ")");
             }
-        } else {
-            throw new AnsibleTowerException("Unexpected error code returned ("+ response.getStatusLine().getStatusCode() +")");
         }
     }
 
