@@ -6,6 +6,7 @@ package org.jenkinsci.plugins.ansible_tower.util;
 
 import com.google.common.net.HttpHeaders;
 import net.sf.json.JSONArray;
+import org.jenkinsci.plugins.ansible_tower.exceptions.AnsibleTowerDoesNotSupportAuthtoken;
 import org.jenkinsci.plugins.ansible_tower.exceptions.AnsibleTowerException;
 
 import java.io.IOException;
@@ -148,13 +149,23 @@ public class TowerConnector {
         }
 
 
-        if((this.username != null || this.password != null) && this.authToken == null) {
-            logger.logMessage("Adding basic auth for "+ this.username);
-            this.authToken = getAuthToken();
-        }
-        if(this.authToken != null) {
-            logger.logMessage("Adding token auth for "+ this.username);
-            request.setHeader("Authorization", "Token "+ this.authToken);
+        if(this.username != null || this.password != null) {
+            if(this.authToken == null) {
+                try {
+                    this.authToken = getAuthToken();
+                } catch(AnsibleTowerDoesNotSupportAuthtoken dneat) {
+                    logger.logMessage("Tower does not support authtoken, reverting to basic auth");
+                    this.authToken = "BasicAuth";
+                }
+            }
+
+            if(this.authToken != null && !this.authToken.equals("BasicAuth")) {
+                logger.logMessage("Adding token auth for "+ this.username);
+                request.setHeader(HttpHeaders.AUTHORIZATION, "Token "+ this.authToken);
+            } else {
+                logger.logMessage("Adding basic auth for "+ this.username);
+                request.setHeader(HttpHeaders.AUTHORIZATION, this.getBasicAuthString());
+            }
         }
 
         DefaultHttpClient httpClient = getHttpClient();
@@ -658,15 +669,18 @@ public class TowerConnector {
         return returnURL;
     }
 
-    private String getAuthToken() throws AnsibleTowerException {
-        logger.logMessage("Adding auth for "+ this.username);
+    private String getBasicAuthString() {
         String auth = this.username + ":" + this.password;
         byte[] encodedAuth = Base64.encodeBase64(auth.getBytes(Charset.forName("UTF-8")));
-        String authHeader = "Basic " + new String(encodedAuth, Charset.forName("UTF-8"));
+        return "Basic " + new String(encodedAuth, Charset.forName("UTF-8"));
+    }
+
+    private String getAuthToken() throws AnsibleTowerException {
+        logger.logMessage("Adding auth for "+ this.username);
 
         String tokenURI = url + "/api/v1/authtoken/";
         HttpPost tokenRequest = new HttpPost(tokenURI);
-        tokenRequest.setHeader(HttpHeaders.AUTHORIZATION, authHeader);
+        tokenRequest.setHeader(HttpHeaders.AUTHORIZATION, this.getBasicAuthString());
         JSONObject body = new JSONObject();
         body.put("username", this.username);
         body.put("password", this.password);
@@ -689,6 +703,8 @@ public class TowerConnector {
 
         if(response.getStatusLine().getStatusCode() == 400) {
             throw new AnsibleTowerException("Username/password invalid");
+        } else if(response.getStatusLine().getStatusCode() == 404) {
+            throw new AnsibleTowerDoesNotSupportAuthtoken("");
         } else if(response.getStatusLine().getStatusCode() != 200) {
             throw new AnsibleTowerException("Unable to get auth token");
         }
