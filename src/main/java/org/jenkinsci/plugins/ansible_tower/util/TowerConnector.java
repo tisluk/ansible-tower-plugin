@@ -706,7 +706,7 @@ public class TowerConnector {
         } else if(response.getStatusLine().getStatusCode() == 404) {
             throw new AnsibleTowerDoesNotSupportAuthtoken("");
         } else if(response.getStatusLine().getStatusCode() != 200) {
-            throw new AnsibleTowerException("Unable to get auth token");
+            throw new AnsibleTowerException("Unable to get auth token, server responded with ("+ response.getStatusLine().getStatusCode() +")");
         }
 
         JSONObject responseObject;
