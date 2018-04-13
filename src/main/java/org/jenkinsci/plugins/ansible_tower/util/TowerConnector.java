@@ -67,6 +67,10 @@ public class TowerConnector {
     }
 
     public TowerConnector(String url, String username, String password, Boolean trustAllCerts, Boolean debug) {
+        // Credit to https://stackoverflow.com/questions/7438612/how-to-remove-the-last-character-from-a-string
+        if(url != null && url.length() > 0 && url.charAt(url.length() - 1) == '/') {
+            url = url.substring(0, (url.length() - 1));
+        }
         this.url = url;
         this.username = username;
         this.password = password;
