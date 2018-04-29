@@ -66,7 +66,6 @@
                 <artifactId>maven-hpi-plugin</artifactId>
                 <configuration>
                     <pluginFirstClassLoader>true</pluginFirstClassLoader>
-                    <compatibleSinceVersion>1.8.17</compatibleSinceVersion>
                 </configuration>
             </plugin>
             <plugin>
