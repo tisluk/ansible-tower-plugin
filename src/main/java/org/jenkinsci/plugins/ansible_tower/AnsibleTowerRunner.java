@@ -23,7 +23,7 @@ import java.util.Set;
 
 public class AnsibleTowerRunner {
     public boolean runJobTemplate(
-            PrintStream logger, String towerServer, String jobTemplate, String extraVars, String limit,
+            PrintStream logger, String towerServer, String jobTemplate, String jobType, String extraVars, String limit,
             String jobTags, String inventory, String credential, boolean verbose, boolean importTowerLogs,
             boolean removeColor, EnvVars envVars, String templateType, boolean importWorkflowChildLogs,
             FilePath ws, Run<?,?> run
@@ -51,6 +51,7 @@ public class AnsibleTowerRunner {
         if(extraVars.equals(""))    { extraVars= null; }
         if(limit.equals(""))        { limit= null; }
         if(jobTags.equals(""))      { jobTags= null; }
+        if(jobType.equals(""))      { jobType=null;}
         if(inventory.equals(""))    { inventory= null; }
         if(credential.equals(""))   { credential= null; }
 
@@ -59,12 +60,16 @@ public class AnsibleTowerRunner {
         String expandedExtraVars = envVars.expand(extraVars);
         String expandedLimit = envVars.expand(limit);
         String expandedJobTags = envVars.expand(jobTags);
+        String expandedJobType = envVars.expand(jobType);
         String expandedInventory = envVars.expand(inventory);
         String expandedCredential = envVars.expand(credential);
 
         if (verbose) {
             if(expandedJobTemplate != null && !expandedJobTemplate.equals(jobTemplate)) {
                 logger.println("Expanded job template to " + expandedJobTemplate);
+            }
+            if(expandedJobType != null && !expandedJobType.equals(jobType)) {
+                logger.println("Expanded job type to " + expandedJobType);
             }
             if(expandedExtraVars != null && !expandedExtraVars.equals(extraVars)) {
                 logger.println("Expanded extra vars to " + expandedExtraVars);
@@ -126,7 +131,7 @@ public class AnsibleTowerRunner {
         }
         int myJobID;
         try {
-            myJobID = myTowerConnection.submitTemplate(template.getInt("id"), expandedExtraVars, expandedLimit, expandedJobTags, expandedInventory, expandedCredential, templateType);
+            myJobID = myTowerConnection.submitTemplate(template.getInt("id"), expandedExtraVars, expandedLimit, expandedJobTags,expandedJobType, expandedInventory, expandedCredential, templateType);
         } catch (AnsibleTowerException e) {
             logger.println("ERROR: Unable to request job template invocation " + e.getMessage());
             return false;
