@@ -202,6 +202,8 @@ public class AnsibleTowerStep extends AbstractStepImpl {
             if(step.getLimit() != null) { limit = step.getLimit(); }
             String tags = "";
             if(step.getJobTags() != null) { tags = step.getJobTags(); }
+            String jobType = "";
+            if(step.getJobType() != null){ jobType = step.getJobType();}
             String inventory = "";
             if(step.getInventory() != null) { inventory = step.getInventory(); }
             String credential = "";
@@ -218,7 +220,7 @@ public class AnsibleTowerStep extends AbstractStepImpl {
             if(step.getImportWorkflowChildLogs() != null) { importWorkflowChildLogs = step.getImportWorkflowChildLogs(); }
 
             boolean runResult = runner.runJobTemplate(
-                    listener.getLogger(), step.getTowerServer(), step.getJobTemplate(), step.getJobType(),extraVars,
+                    listener.getLogger(), step.getTowerServer(), step.getJobTemplate(), jobType,extraVars,
                     limit, tags, inventory, credential, verbose, importTowerLogs, removeColor, envVars,
                     templateType, importWorkflowChildLogs, ws, run
             );
