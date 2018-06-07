@@ -323,7 +323,7 @@ public class TowerConnector {
         if(jobTags != null && !jobTags.isEmpty()) {
             postBody.put("job_tags", jobTags);
         }
-        if(jobType != null &&  jobType.isEmpty()){
+        if(jobType != null &&  !jobType.isEmpty()){
             postBody.put("job_type", jobType);
         }
         if(extraVars != null && !extraVars.isEmpty()) {
