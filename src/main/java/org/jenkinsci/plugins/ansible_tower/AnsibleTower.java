@@ -140,7 +140,7 @@ public class AnsibleTower extends Builder {
 		public static final String extraVars      			= "";
 		public static final String limit          			= "";
         public static final String jobTags        			= "";
-		public static final String jobType					= "";
+		public static final String jobType					= "run";
 		public static final String inventory      			= "";
 		public static final String credential     			= "";
 		public static final Boolean verbose       			= false;
@@ -177,6 +177,13 @@ public class AnsibleTower extends Builder {
         	items.add("workflow");
         	return items;
 		}
+
+	public ListBoxModel doFillJobTypeItems() {
+		ListBoxModel items = new ListBoxModel();
+		items.add("run");
+		items.add("check");
+		return items;
+        }
 
         // Some day I'd like to be able to make all of these dropdowns from querying the tower API
 		// Maybe not in real time because that would be slow when loading a the configure job
