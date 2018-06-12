@@ -27,7 +27,7 @@ import java.io.File;
 public class AnsibleTowerStep extends AbstractStepImpl {
     private String towerServer              = "";
     private String jobTemplate              = "";
-    private String jobType                  = "";
+    private String jobType                  = "run";
     private String extraVars                = "";
     private String limit                    = "";
     private String jobTags                  = "";
@@ -153,6 +153,12 @@ public class AnsibleTowerStep extends AbstractStepImpl {
             items.add("workflow");
             return items;
         }
+        public ListBoxModel doFillJobTypeItems() {
+            ListBoxModel items = new ListBoxModel();
+            items.add("run");
+            items.add("check");
+            return items;
+        }
 
         public boolean isGlobalColorAllowed() {
             System.out.println("Using the descriptor is global color allowed");
@@ -202,7 +208,7 @@ public class AnsibleTowerStep extends AbstractStepImpl {
             if(step.getLimit() != null) { limit = step.getLimit(); }
             String tags = "";
             if(step.getJobTags() != null) { tags = step.getJobTags(); }
-            String jobType = "";
+            String jobType = "run";
             if(step.getJobType() != null){ jobType = step.getJobType();}
             String inventory = "";
             if(step.getInventory() != null) { inventory = step.getInventory(); }
@@ -220,7 +226,7 @@ public class AnsibleTowerStep extends AbstractStepImpl {
             if(step.getImportWorkflowChildLogs() != null) { importWorkflowChildLogs = step.getImportWorkflowChildLogs(); }
 
             boolean runResult = runner.runJobTemplate(
-                    listener.getLogger(), step.getTowerServer(), step.getJobTemplate(), jobType,extraVars,
+                    listener.getLogger(), step.getTowerServer(), step.getJobTemplate(), jobType, extraVars,
                     limit, tags, inventory, credential, verbose, importTowerLogs, removeColor, envVars,
                     templateType, importWorkflowChildLogs, ws, run
             );
