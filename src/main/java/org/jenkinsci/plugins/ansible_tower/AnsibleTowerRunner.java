@@ -99,6 +99,9 @@ public class AnsibleTowerRunner {
         }
 
 
+        if(jobType != null && template.containsKey("ask_job_type_on_launch") && !template.getBoolean("ask_job_type_on_launch")) {
+            logger.println("[WARNING]: Jot type defined but prompt for job type on launch is not set in tower job");
+        }
         if(expandedExtraVars != null && template.containsKey("ask_variables_on_launch") && !template.getBoolean("ask_variables_on_launch")) {
             logger.println("[WARNING]: Extra variables defined but prompt for variables on launch is not set in tower job");
         }
