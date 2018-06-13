@@ -15,6 +15,9 @@
     <f:entry field="jobTags" title="Job Tags" help="/plugin/ansible-tower/help-jobTags.html">
         <f:textbox />
     </f:entry>
+    <f:entry field="jobType" title="Job Type" help="/plugin/ansible-tower/help-jobType.html">
+        <f:select/>
+    </f:entry>
     <f:entry field="limit" title="Limit" help="/plugin/ansible-tower/help-limit.html">
         <f:textbox />
     </f:entry>

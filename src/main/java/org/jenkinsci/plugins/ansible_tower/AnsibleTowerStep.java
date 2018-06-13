@@ -27,6 +27,7 @@ import java.io.File;
 public class AnsibleTowerStep extends AbstractStepImpl {
     private String towerServer              = "";
     private String jobTemplate              = "";
+    private String jobType                  = "run";
     private String extraVars                = "";
     private String limit                    = "";
     private String jobTags                  = "";
@@ -40,7 +41,7 @@ public class AnsibleTowerStep extends AbstractStepImpl {
 
     @DataBoundConstructor
     public AnsibleTowerStep(
-            @Nonnull String towerServer, @Nonnull String jobTemplate, String extraVars, String jobTags,
+            @Nonnull String towerServer, @Nonnull String jobTemplate, String jobType, String extraVars, String jobTags,
             String limit, String inventory, String credential, Boolean verbose, Boolean importTowerLogs,
             Boolean removeColor, String templateType, Boolean importWorkflowChildLogs
     ) {
@@ -48,6 +49,7 @@ public class AnsibleTowerStep extends AbstractStepImpl {
         this.jobTemplate = jobTemplate;
         this.extraVars = extraVars;
         this.jobTags = jobTags;
+        this.jobType = jobType;
         this.limit = limit;
         this.inventory = inventory;
         this.credential = credential;
@@ -64,6 +66,7 @@ public class AnsibleTowerStep extends AbstractStepImpl {
     public String getJobTemplate()              { return jobTemplate; }
     public String getExtraVars()                { return extraVars; }
     public String getJobTags()                  { return jobTags; }
+    public String getJobType()                  { return jobType;}
     public String getLimit()                    { return limit; }
     public String getInventory()                { return inventory; }
     public String getCredential()               { return credential; }
@@ -81,6 +84,8 @@ public class AnsibleTowerStep extends AbstractStepImpl {
     public void setExtraVars(String extraVars) { this.extraVars = extraVars; }
     @DataBoundSetter
     public void setJobTags(String jobTags) { this.jobTags = jobTags; }
+    @DataBoundSetter
+    public void setJobType(String jobType) { this.jobType = jobType; }
     @DataBoundSetter
     public void setLimit(String limit) { this.limit = limit; }
     @DataBoundSetter
@@ -107,6 +112,7 @@ public class AnsibleTowerStep extends AbstractStepImpl {
     public static final class DescriptorImpl extends AbstractStepDescriptorImpl {
         public static final String towerServer              = AnsibleTower.DescriptorImpl.towerServer;
         public static final String jobTemplate              = AnsibleTower.DescriptorImpl.jobTemplate;
+        public static final String jobType                  = AnsibleTower.DescriptorImpl.jobType;
         public static final String extraVars                = AnsibleTower.DescriptorImpl.extraVars;
         public static final String limit                    = AnsibleTower.DescriptorImpl.limit;
         public static final String jobTags                  = AnsibleTower.DescriptorImpl.jobTags;
@@ -145,6 +151,12 @@ public class AnsibleTowerStep extends AbstractStepImpl {
             ListBoxModel items = new ListBoxModel();
             items.add("job");
             items.add("workflow");
+            return items;
+        }
+        public ListBoxModel doFillJobTypeItems() {
+            ListBoxModel items = new ListBoxModel();
+            items.add("run");
+            items.add("check");
             return items;
         }
 
@@ -196,6 +208,8 @@ public class AnsibleTowerStep extends AbstractStepImpl {
             if(step.getLimit() != null) { limit = step.getLimit(); }
             String tags = "";
             if(step.getJobTags() != null) { tags = step.getJobTags(); }
+            String jobType = "run";
+            if(step.getJobType() != null){ jobType = step.getJobType();}
             String inventory = "";
             if(step.getInventory() != null) { inventory = step.getInventory(); }
             String credential = "";
@@ -212,7 +226,7 @@ public class AnsibleTowerStep extends AbstractStepImpl {
             if(step.getImportWorkflowChildLogs() != null) { importWorkflowChildLogs = step.getImportWorkflowChildLogs(); }
 
             boolean runResult = runner.runJobTemplate(
-                    listener.getLogger(), step.getTowerServer(), step.getJobTemplate(), extraVars,
+                    listener.getLogger(), step.getTowerServer(), step.getJobTemplate(), jobType, extraVars,
                     limit, tags, inventory, credential, verbose, importTowerLogs, removeColor, envVars,
                     templateType, importWorkflowChildLogs, ws, run
             );

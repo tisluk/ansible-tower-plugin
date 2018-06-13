@@ -28,6 +28,7 @@ public class AnsibleTower extends Builder {
 	private @Nonnull String jobTemplate     = DescriptorImpl.jobTemplate;
 	private String extraVars                = DescriptorImpl.extraVars;
 	private String jobTags                  = DescriptorImpl.jobTags;
+	private String jobType                  = DescriptorImpl.jobType;
     private String limit                    = DescriptorImpl.limit;
     private String inventory                = DescriptorImpl.inventory;
     private String credential               = DescriptorImpl.credential;
@@ -39,7 +40,7 @@ public class AnsibleTower extends Builder {
 
 	@DataBoundConstructor
 	public AnsibleTower(
-			@Nonnull String towerServer, @Nonnull String jobTemplate, String extraVars, String jobTags,
+			@Nonnull String towerServer, @Nonnull String jobTemplate, String jobType, String extraVars, String jobTags,
 			String limit, String inventory, String credential, Boolean verbose, Boolean importTowerLogs,
 			Boolean removeColor, String templateType, Boolean importWorkflowChildLogs
 	) {
@@ -47,6 +48,7 @@ public class AnsibleTower extends Builder {
 		this.jobTemplate = jobTemplate;
 		this.extraVars = extraVars;
 		this.jobTags = jobTags;
+		this.jobType = jobType;
 		this.limit = limit;
 		this.inventory = inventory;
 		this.credential = credential;
@@ -63,6 +65,7 @@ public class AnsibleTower extends Builder {
 	public String getJobTemplate() { return jobTemplate; }
 	public String getExtraVars() { return extraVars; }
 	public String getJobTags() { return jobTags; }
+	public String getJobType() { return jobType; }
 	public String getLimit() { return limit; }
 	public String getInventory() { return inventory; }
 	public String getCredential() { return credential; }
@@ -80,6 +83,8 @@ public class AnsibleTower extends Builder {
 	public void setExtraVars(String extraVars) { this.extraVars = extraVars; }
 	@DataBoundSetter
 	public void setJobTags(String jobTags) { this.jobTags = jobTags; }
+	@DataBoundSetter
+	public void setJobType(String jobType) { this.jobType = jobType; }
 	@DataBoundSetter
 	public void setLimit(String limit) { this.limit = limit; }
 	@DataBoundSetter
@@ -114,7 +119,7 @@ public class AnsibleTower extends Builder {
 		if(this.getImportWorkflowChildLogs() != null) { importWorkflowChildLogs = this.getImportWorkflowChildLogs(); }
 
 		boolean runResult = runner.runJobTemplate(
-				listener.getLogger(), this.getTowerServer(), this.getJobTemplate(), this.getExtraVars(),
+				listener.getLogger(), this.getTowerServer(), this.getJobTemplate(), this.getJobType(),this.getExtraVars(),
 				this.getLimit(), this.getJobTags(), this.getInventory(), this.getCredential(), this.verbose,
 				this.importTowerLogs, this.getRemoveColor(), envVars, templateType, importWorkflowChildLogs,
 				build.getWorkspace(), build
@@ -135,6 +140,7 @@ public class AnsibleTower extends Builder {
 		public static final String extraVars      			= "";
 		public static final String limit          			= "";
         public static final String jobTags        			= "";
+		public static final String jobType					= "run";
 		public static final String inventory      			= "";
 		public static final String credential     			= "";
 		public static final Boolean verbose       			= false;
@@ -171,6 +177,13 @@ public class AnsibleTower extends Builder {
         	items.add("workflow");
         	return items;
 		}
+
+	public ListBoxModel doFillJobTypeItems() {
+		ListBoxModel items = new ListBoxModel();
+		items.add("run");
+		items.add("check");
+		return items;
+        }
 
         // Some day I'd like to be able to make all of these dropdowns from querying the tower API
 		// Maybe not in real time because that would be slow when loading a the configure job

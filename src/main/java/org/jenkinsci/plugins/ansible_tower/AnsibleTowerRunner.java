@@ -23,7 +23,7 @@ import java.util.Set;
 
 public class AnsibleTowerRunner {
     public boolean runJobTemplate(
-            PrintStream logger, String towerServer, String jobTemplate, String extraVars, String limit,
+            PrintStream logger, String towerServer, String jobTemplate, String jobType, String extraVars, String limit,
             String jobTags, String inventory, String credential, boolean verbose, boolean importTowerLogs,
             boolean removeColor, EnvVars envVars, String templateType, boolean importWorkflowChildLogs,
             FilePath ws, Run<?,?> run
@@ -99,6 +99,9 @@ public class AnsibleTowerRunner {
         }
 
 
+        if(jobType != null && template.containsKey("ask_job_type_on_launch") && !template.getBoolean("ask_job_type_on_launch")) {
+            logger.println("[WARNING]: Jot type defined but prompt for job type on launch is not set in tower job");
+        }
         if(expandedExtraVars != null && template.containsKey("ask_variables_on_launch") && !template.getBoolean("ask_variables_on_launch")) {
             logger.println("[WARNING]: Extra variables defined but prompt for variables on launch is not set in tower job");
         }
@@ -126,7 +129,7 @@ public class AnsibleTowerRunner {
         }
         int myJobID;
         try {
-            myJobID = myTowerConnection.submitTemplate(template.getInt("id"), expandedExtraVars, expandedLimit, expandedJobTags, expandedInventory, expandedCredential, templateType);
+            myJobID = myTowerConnection.submitTemplate(template.getInt("id"), expandedExtraVars, expandedLimit, expandedJobTags,jobType, expandedInventory, expandedCredential, templateType);
         } catch (AnsibleTowerException e) {
             logger.println("ERROR: Unable to request job template invocation " + e.getMessage());
             return false;
