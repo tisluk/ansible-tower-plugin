@@ -31,6 +31,7 @@ public class AnsibleTowerStep extends AbstractStepImpl {
     private String extraVars                = "";
     private String limit                    = "";
     private String jobTags                  = "";
+    private String skipJobTags              = "";
     private String inventory                = "";
     private String credential               = "";
     private Boolean verbose                 = false;
@@ -42,13 +43,14 @@ public class AnsibleTowerStep extends AbstractStepImpl {
     @DataBoundConstructor
     public AnsibleTowerStep(
             @Nonnull String towerServer, @Nonnull String jobTemplate, String jobType, String extraVars, String jobTags,
-            String limit, String inventory, String credential, Boolean verbose, Boolean importTowerLogs,
-            Boolean removeColor, String templateType, Boolean importWorkflowChildLogs
+            String skipJobTags, String limit, String inventory, String credential, Boolean verbose,
+            Boolean importTowerLogs, Boolean removeColor, String templateType, Boolean importWorkflowChildLogs
     ) {
         this.towerServer = towerServer;
         this.jobTemplate = jobTemplate;
         this.extraVars = extraVars;
         this.jobTags = jobTags;
+        this.skipJobTags = skipJobTags;
         this.jobType = jobType;
         this.limit = limit;
         this.inventory = inventory;
@@ -66,6 +68,7 @@ public class AnsibleTowerStep extends AbstractStepImpl {
     public String getJobTemplate()              { return jobTemplate; }
     public String getExtraVars()                { return extraVars; }
     public String getJobTags()                  { return jobTags; }
+    public String getSkipJobTags()              { return skipJobTags; }
     public String getJobType()                  { return jobType;}
     public String getLimit()                    { return limit; }
     public String getInventory()                { return inventory; }
@@ -84,6 +87,8 @@ public class AnsibleTowerStep extends AbstractStepImpl {
     public void setExtraVars(String extraVars) { this.extraVars = extraVars; }
     @DataBoundSetter
     public void setJobTags(String jobTags) { this.jobTags = jobTags; }
+    @DataBoundSetter
+    public void setSkipJobTags(String skipJobTags) { this.skipJobTags = skipJobTags; }
     @DataBoundSetter
     public void setJobType(String jobType) { this.jobType = jobType; }
     @DataBoundSetter
@@ -116,6 +121,7 @@ public class AnsibleTowerStep extends AbstractStepImpl {
         public static final String extraVars                = AnsibleTower.DescriptorImpl.extraVars;
         public static final String limit                    = AnsibleTower.DescriptorImpl.limit;
         public static final String jobTags                  = AnsibleTower.DescriptorImpl.jobTags;
+        public static final String skipJobTags              = AnsibleTower.DescriptorImpl.skipJobTags;
         public static final String inventory                = AnsibleTower.DescriptorImpl.inventory;
         public static final String credential               = AnsibleTower.DescriptorImpl.credential;
         public static final Boolean verbose                 = AnsibleTower.DescriptorImpl.verbose;
@@ -208,6 +214,8 @@ public class AnsibleTowerStep extends AbstractStepImpl {
             if(step.getLimit() != null) { limit = step.getLimit(); }
             String tags = "";
             if(step.getJobTags() != null) { tags = step.getJobTags(); }
+            String skipTags = "";
+            if(step.getSkipJobTags() != null) { skipTags = step.getSkipJobTags(); }
             String jobType = "run";
             if(step.getJobType() != null){ jobType = step.getJobType();}
             String inventory = "";
@@ -227,7 +235,7 @@ public class AnsibleTowerStep extends AbstractStepImpl {
 
             boolean runResult = runner.runJobTemplate(
                     listener.getLogger(), step.getTowerServer(), step.getJobTemplate(), jobType, extraVars,
-                    limit, tags, inventory, credential, verbose, importTowerLogs, removeColor, envVars,
+                    limit, tags, skipTags, inventory, credential, verbose, importTowerLogs, removeColor, envVars,
                     templateType, importWorkflowChildLogs, ws, run
             );
             if(!runResult) {

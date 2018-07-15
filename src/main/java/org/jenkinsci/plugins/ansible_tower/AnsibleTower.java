@@ -28,6 +28,7 @@ public class AnsibleTower extends Builder {
 	private @Nonnull String jobTemplate     = DescriptorImpl.jobTemplate;
 	private String extraVars                = DescriptorImpl.extraVars;
 	private String jobTags                  = DescriptorImpl.jobTags;
+	private String skipJobTags              = DescriptorImpl.skipJobTags;
 	private String jobType                  = DescriptorImpl.jobType;
     private String limit                    = DescriptorImpl.limit;
     private String inventory                = DescriptorImpl.inventory;
@@ -41,13 +42,14 @@ public class AnsibleTower extends Builder {
 	@DataBoundConstructor
 	public AnsibleTower(
 			@Nonnull String towerServer, @Nonnull String jobTemplate, String jobType, String extraVars, String jobTags,
-			String limit, String inventory, String credential, Boolean verbose, Boolean importTowerLogs,
-			Boolean removeColor, String templateType, Boolean importWorkflowChildLogs
+			String skipJobTags, String limit, String inventory, String credential, Boolean verbose,
+			Boolean importTowerLogs, Boolean removeColor, String templateType, Boolean importWorkflowChildLogs
 	) {
 		this.towerServer = towerServer;
 		this.jobTemplate = jobTemplate;
 		this.extraVars = extraVars;
 		this.jobTags = jobTags;
+		this.skipJobTags = skipJobTags;
 		this.jobType = jobType;
 		this.limit = limit;
 		this.inventory = inventory;
@@ -65,6 +67,7 @@ public class AnsibleTower extends Builder {
 	public String getJobTemplate() { return jobTemplate; }
 	public String getExtraVars() { return extraVars; }
 	public String getJobTags() { return jobTags; }
+	public String getSkipJobTags() { return skipJobTags; }
 	public String getJobType() { return jobType; }
 	public String getLimit() { return limit; }
 	public String getInventory() { return inventory; }
@@ -83,6 +86,8 @@ public class AnsibleTower extends Builder {
 	public void setExtraVars(String extraVars) { this.extraVars = extraVars; }
 	@DataBoundSetter
 	public void setJobTags(String jobTags) { this.jobTags = jobTags; }
+	@DataBoundSetter
+	public void setSkipJobTags(String skipJobTags) { this.skipJobTags = skipJobTags; }
 	@DataBoundSetter
 	public void setJobType(String jobType) { this.jobType = jobType; }
 	@DataBoundSetter
@@ -120,8 +125,8 @@ public class AnsibleTower extends Builder {
 
 		boolean runResult = runner.runJobTemplate(
 				listener.getLogger(), this.getTowerServer(), this.getJobTemplate(), this.getJobType(),this.getExtraVars(),
-				this.getLimit(), this.getJobTags(), this.getInventory(), this.getCredential(), this.verbose,
-				this.importTowerLogs, this.getRemoveColor(), envVars, templateType, importWorkflowChildLogs,
+				this.getLimit(), this.getJobTags(), this.getSkipJobTags(), this.getInventory(), this.getCredential(),
+				this.verbose, this.importTowerLogs, this.getRemoveColor(), envVars, templateType, importWorkflowChildLogs,
 				build.getWorkspace(), build
 		);
 		if(runResult) {
@@ -140,6 +145,7 @@ public class AnsibleTower extends Builder {
 		public static final String extraVars      			= "";
 		public static final String limit          			= "";
         public static final String jobTags        			= "";
+		public static final String skipJobTags        		= "";
 		public static final String jobType					= "run";
 		public static final String inventory      			= "";
 		public static final String credential     			= "";

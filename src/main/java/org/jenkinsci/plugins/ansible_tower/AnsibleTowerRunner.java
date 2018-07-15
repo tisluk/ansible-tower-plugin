@@ -24,9 +24,9 @@ import java.util.Set;
 public class AnsibleTowerRunner {
     public boolean runJobTemplate(
             PrintStream logger, String towerServer, String jobTemplate, String jobType, String extraVars, String limit,
-            String jobTags, String inventory, String credential, boolean verbose, boolean importTowerLogs,
-            boolean removeColor, EnvVars envVars, String templateType, boolean importWorkflowChildLogs,
-            FilePath ws, Run<?,?> run
+            String jobTags, String skipJobTags, String inventory, String credential, boolean verbose,
+            boolean importTowerLogs, boolean removeColor, EnvVars envVars, String templateType,
+            boolean importWorkflowChildLogs, FilePath ws, Run<?,?> run
     ) {
         if (verbose) {
             logger.println("Beginning Ansible Tower Run on " + towerServer);
@@ -47,18 +47,20 @@ public class AnsibleTowerRunner {
         TowerConnector myTowerConnection = towerConfigToRunOn.getTowerConnector();
 
         // If they came in empty then set them to null so that we don't pass a nothing through
-        if(jobTemplate.equals(""))  { jobTemplate = null; }
-        if(extraVars.equals(""))    { extraVars= null; }
-        if(limit.equals(""))        { limit= null; }
-        if(jobTags.equals(""))      { jobTags= null; }
-        if(inventory.equals(""))    { inventory= null; }
-        if(credential.equals(""))   { credential= null; }
+        if(jobTemplate != null && jobTemplate.equals(""))   { jobTemplate = null; }
+        if(extraVars != null && extraVars.equals(""))       { extraVars= null; }
+        if(limit != null && limit.equals(""))               { limit= null; }
+        if(jobTags != null && jobTags.equals(""))           { jobTags= null; }
+        if(skipJobTags != null && skipJobTags.equals(""))   { skipJobTags= null; }
+        if(inventory != null && inventory.equals(""))       { inventory= null; }
+        if(credential != null && credential.equals(""))     { credential= null; }
 
         // Expand all of the parameters
         String expandedJobTemplate = envVars.expand(jobTemplate);
         String expandedExtraVars = envVars.expand(extraVars);
         String expandedLimit = envVars.expand(limit);
         String expandedJobTags = envVars.expand(jobTags);
+        String expandedSkipJobTags = envVars.expand(skipJobTags);
         String expandedInventory = envVars.expand(inventory);
         String expandedCredential = envVars.expand(credential);
 
@@ -75,6 +77,9 @@ public class AnsibleTowerRunner {
             if(expandedJobTags != null && !expandedJobTags.equals(jobTags)) {
                 logger.println("Expanded job tags to " + expandedJobTags);
             }
+            if(expandedSkipJobTags != null && !expandedSkipJobTags.equals(skipJobTags)) {
+                logger.println("Expanded skip job tags to " + expandedSkipJobTags);
+            }
             if(expandedInventory != null && !expandedInventory.equals(inventory)) {
                 logger.println("Expanded inventory to " + expandedInventory);
             }
@@ -86,6 +91,12 @@ public class AnsibleTowerRunner {
         if(expandedJobTags != null && expandedJobTags.equalsIgnoreCase("")) {
             if(!expandedJobTags.startsWith(",")) {
                 expandedJobTags = ","+ expandedJobTags;
+            }
+        }
+
+        if(expandedSkipJobTags != null && expandedSkipJobTags.equalsIgnoreCase("")) {
+            if(!expandedSkipJobTags.startsWith(",")) {
+                expandedSkipJobTags = ","+ expandedSkipJobTags;
             }
         }
 
@@ -111,6 +122,9 @@ public class AnsibleTowerRunner {
         if(expandedJobTags != null && template.containsKey("ask_tags_on_launch") && !template.getBoolean("ask_tags_on_launch")) {
             logger.println("[WARNING]: Job Tags defined but prompt for tags on launch is not set in tower job");
         }
+        if(expandedSkipJobTags != null && template.containsKey("ask_skip_tags_on_launch") && !template.getBoolean("ask_skip_tags_on_launch")) {
+            logger.println("[WARNING]: Skip Job Tags defined but prompt for tags on launch is not set in tower job");
+        }
         if(expandedInventory != null && template.containsKey("ask_inventory_on_launch") && !template.getBoolean("ask_inventory_on_launch")) {
             logger.println("[WARNING]: Inventory defined but prompt for inventory on launch is not set in tower job");
         }
@@ -129,7 +143,7 @@ public class AnsibleTowerRunner {
         }
         int myJobID;
         try {
-            myJobID = myTowerConnection.submitTemplate(template.getInt("id"), expandedExtraVars, expandedLimit, expandedJobTags,jobType, expandedInventory, expandedCredential, templateType);
+            myJobID = myTowerConnection.submitTemplate(template.getInt("id"), expandedExtraVars, expandedLimit, expandedJobTags, expandedSkipJobTags, jobType, expandedInventory, expandedCredential, templateType);
         } catch (AnsibleTowerException e) {
             logger.println("ERROR: Unable to request job template invocation " + e.getMessage());
             return false;
