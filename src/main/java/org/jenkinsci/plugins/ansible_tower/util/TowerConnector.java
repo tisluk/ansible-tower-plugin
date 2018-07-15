@@ -47,6 +47,7 @@ public class TowerConnector {
     public static final String JOB_TEMPLATE_TYPE = "job";
     public static final String WORKFLOW_TEMPLATE_TYPE = "workflow";
     private static final String ARTIFACTS = "artifacts";
+    private static String API_VERSION = "v2";
 
     private String authToken = null;
     private String url = null;
@@ -61,6 +62,7 @@ public class TowerConnector {
     private PrintStream jenkinsLogger = null;
     private boolean removeColor = true;
     private HashMap<String, String> jenkinsExports = new HashMap<String, String>();
+
 
     public TowerConnector(String url, String username, String password) {
         this(url, username, password, false, false);
@@ -118,6 +120,13 @@ public class TowerConnector {
         }
     }
 
+    private String buildEndpoint(String endpoint) {
+        String full_endpoint = "/api/"+ API_VERSION;
+        if(!endpoint.startsWith("/")) { full_endpoint += "/"; }
+        full_endpoint += endpoint;
+        return full_endpoint;
+    }
+
     private HttpResponse makeRequest(int requestType, String endpoint) throws AnsibleTowerException {
         return makeRequest(requestType, endpoint, null);
     }
@@ -126,7 +135,7 @@ public class TowerConnector {
         // Parse the URL
         URI myURI;
         try {
-            myURI = new URI(url+endpoint);
+            myURI = new URI(url+buildEndpoint(endpoint));
         } catch(Exception e) {
             throw new AnsibleTowerException("URL issue: "+ e.getMessage());
         }
@@ -193,7 +202,7 @@ public class TowerConnector {
     public void testConnection() throws AnsibleTowerException {
         if(url == null) { throw new AnsibleTowerException("The URL is undefined"); }
 
-        HttpResponse response = makeRequest(GET, "/api/v1/ping/");
+        HttpResponse response = makeRequest(GET, "ping/");
 
         if(response.getStatusLine().getStatusCode() != 200) {
             throw new AnsibleTowerException("Unexpected error code returned from test connection ("+ response.getStatusLine().getStatusCode() +")");
@@ -202,6 +211,11 @@ public class TowerConnector {
     }
 
     public String convertPotentialStringToID(String idToCheck, String api_endpoint) throws AnsibleTowerException, AnsibleTowerItemDoesNotExist {
+        JSONObject foundItem = rawLookupByString(idToCheck, api_endpoint);
+        return foundItem.getString("id");
+    }
+
+    public JSONObject rawLookupByString(String idToCheck, String api_endpoint) throws AnsibleTowerException, AnsibleTowerItemDoesNotExist {
         try {
             Integer.parseInt(idToCheck);
             // We got an ID so lets see if we can load that item
@@ -215,7 +229,7 @@ public class TowerConnector {
             } catch (IOException ioe) {
                 throw new AnsibleTowerException(ioe.getMessage());
             }
-            return idToCheck;
+            return responseObject;
         } catch(NumberFormatException nfe) {
 
             HttpResponse response = null;
@@ -245,7 +259,7 @@ public class TowerConnector {
                 throw new AnsibleTowerException("The item "+ idToCheck +" is not unique");
             } else {
                 JSONObject foundItem = (JSONObject) responseObject.getJSONArray("results").get(0);
-                return foundItem.getString("id");
+                return foundItem;
             }
         }
     }
@@ -256,9 +270,9 @@ public class TowerConnector {
         }
 
         checkTemplateType(templateType);
-        String apiEndPoint = "/api/v1/job_templates/";
+        String apiEndPoint = "/job_templates/";
         if(templateType.equalsIgnoreCase(WORKFLOW_TEMPLATE_TYPE)) {
-            apiEndPoint = "/api/v1/workflow_job_templates/";
+            apiEndPoint = "/workflow_job_templates/";
         }
 
         try {
@@ -285,12 +299,114 @@ public class TowerConnector {
     }
 
 
+    private void processCredentials(String credential, JSONObject postBody) throws AnsibleTowerException {
+        // Get the machine or vault credential types
+        HttpResponse response = makeRequest(GET,"/credential_types/?or__kind=ssh&or__kind=vault");
+        if(response.getStatusLine().getStatusCode() != 200) {
+            throw new AnsibleTowerException("Unable to lookup the credential types");
+        }
+        JSONObject responseObject;
+        String json;
+        try {
+            json = EntityUtils.toString(response.getEntity());
+            responseObject = JSONObject.fromObject(json);
+        } catch(IOException ioe) {
+            throw new AnsibleTowerException("Unable to read response and convert it into json: "+ ioe.getMessage());
+        }
+
+        if(responseObject.getInt("count") != 2) {
+            throw new AnsibleTowerException("Unable to find both machine and vault credentials type");
+        }
+
+        int machine_credential_type = -1;
+        int vault_credential_type = -1;
+        JSONArray credentialTypesArray = responseObject.getJSONArray("results");
+        Iterator<JSONObject> listIterator = credentialTypesArray.iterator();
+        while(listIterator.hasNext()) {
+            JSONObject aCredentialType = listIterator.next();
+            if(aCredentialType.getString("kind").equalsIgnoreCase("ssh")) {
+                machine_credential_type = aCredentialType.getInt("id");
+            } else if(aCredentialType.getString("kind").equalsIgnoreCase("vault")) {
+                vault_credential_type = aCredentialType.getInt("id");
+            }
+        }
+
+        if (vault_credential_type == -1) {
+            logger.logMessage("[ERROR]: Unable to find vault credential type");
+        }
+        if (machine_credential_type == -1) {
+            logger.logMessage("[ERROR]: Unable to find machine credential type");
+        }
+        /*
+            Credential can be a comma delineated list and in 2.3.x can come in three types:
+                Machine credentials
+                Vaiult credentials
+                Extra credentials
+                We are going:
+                    Make a hash of the different types
+                    Split the string on , and loop over each item
+                    Find it in Tower and sort it into its type
+         */
+        HashMap<String, Vector<String>> credentials = new HashMap<String, Vector<String>>();
+        credentials.put("vault", new Vector<String>());
+        credentials.put("machine", new Vector<String>());
+        credentials.put("extra", new Vector<String>());
+        for(String credentialString : credential.split(","))  {
+            try {
+                JSONObject jsonCredential = rawLookupByString(credentialString, "/credentials/");
+                String myCredentialType = null;
+                int credentialTypeId = jsonCredential.getInt("credential_type");
+                if (credentialTypeId == machine_credential_type) {
+                    myCredentialType = "machine";
+                } else if (credentialTypeId == vault_credential_type) {
+                    myCredentialType = "vault";
+                } else {
+                    myCredentialType = "extra";
+                }
+                credentials.get(myCredentialType).add(jsonCredential.getString("id"));
+            } catch(AnsibleTowerItemDoesNotExist ateide) {
+                throw new AnsibleTowerException("Credential "+ credentialString +" does not exist in tower");
+            } catch(AnsibleTowerException ate) {
+                throw new AnsibleTowerException("Unable to find credential "+ credentialString +": "+ ate.getMessage());
+            }
+        }
+
+        /*
+            Now that we have processed everything we have to decide which way to pass it into the API.
+            Pre 3.3 there were three possible parameters:
+                extra_vars, vault_credential, machine_credential
+            Starting in 3.3 you can take the seperate parameters or you can pass them all as a single credential param
+
+            The decision point will be wheter or not there is more than one machine or vault credential.
+            This is because the old method is not deprecated but it can't handle more than machine/vault credential
+         */
+        if(credentials.get("machine").size() > 1 || credentials.get("vault").size() > 1) {
+            // We need to pass as a new field
+            JSONArray allCredentials = new JSONArray();
+            allCredentials.addAll(credentials.get("machine"));
+            allCredentials.addAll(credentials.get("vault"));
+            allCredentials.addAll(credentials.get("extra"));
+            postBody.put("credentials", allCredentials);
+        } else {
+            // We need to pass individual fields
+            if(credentials.get("machine").size() > 0) { postBody.put("credential", credentials.get("machine").get(0)); }
+            if(credentials.get("vault").size() > 0) { postBody.put("vault_credential", credentials.get("vault").get(0)); }
+            if(credentials.get("extra").size() > 0) {
+                JSONArray extraCredentials = new JSONArray();
+                extraCredentials.addAll(credentials.get("extra"));
+                postBody.put("extra_credentials", extraCredentials);
+            }
+        }
+
+    }
+
+
     public int submitTemplate(int jobTemplate, String extraVars, String limit, String jobTags, String jobType, String inventory, String credential, String templateType) throws AnsibleTowerException {
         checkTemplateType(templateType);
 
-        String apiEndPoint = "/api/v1/job_templates/";
+        String apiEndPoint = "/job_templates/";
         if(templateType.equalsIgnoreCase(WORKFLOW_TEMPLATE_TYPE)) {
-            apiEndPoint = "/api/v1/workflow_job_templates/";
+            apiEndPoint = "/workflow_job_templates/";
         }
 
         JSONObject postBody = new JSONObject();
@@ -299,7 +415,7 @@ public class TowerConnector {
         // And, in the future, if you can reference objects in tower via a tag/name we don't have to undo work here
         if(inventory != null && !inventory.isEmpty()) {
             try {
-                inventory = convertPotentialStringToID(inventory, "/api/v1/inventories/");
+                inventory = convertPotentialStringToID(inventory, "/inventories/");
             } catch(AnsibleTowerItemDoesNotExist atidne) {
                 throw new AnsibleTowerException("Inventory "+ inventory +" does not exist in tower");
             } catch(AnsibleTowerException ate) {
@@ -308,14 +424,7 @@ public class TowerConnector {
             postBody.put("inventory", inventory);
         }
         if(credential != null && !credential.isEmpty()) {
-            try {
-                credential = convertPotentialStringToID(credential, "/api/v1/credentials/");
-            } catch(AnsibleTowerItemDoesNotExist ateide) {
-                throw new AnsibleTowerException("Credential "+ credential +" does not exist in tower");
-            } catch(AnsibleTowerException ate) {
-                throw new AnsibleTowerException("Unable to find credential "+ credential +": "+ ate.getMessage());
-            }
-            postBody.put("credential", credential);
+            processCredentials(credential, postBody);
         }
         if(limit != null && !limit.isEmpty()) {
             postBody.put("limit", limit);
@@ -385,8 +494,8 @@ public class TowerConnector {
     public boolean isJobCompleted(int jobID, String templateType) throws AnsibleTowerException {
         checkTemplateType(templateType);
 
-        String apiEndpoint = "/api/v1/jobs/"+ jobID +"/";
-        if(templateType.equalsIgnoreCase(WORKFLOW_TEMPLATE_TYPE)) { apiEndpoint = "/api/v1/workflow_jobs/"+ jobID +"/"; }
+        String apiEndpoint = "/jobs/"+ jobID +"/";
+        if(templateType.equalsIgnoreCase(WORKFLOW_TEMPLATE_TYPE)) { apiEndpoint = "/workflow_jobs/"+ jobID +"/"; }
         HttpResponse response = makeRequest(GET, apiEndpoint);
 
         if(response.getStatusLine().getStatusCode() == 200) {
@@ -456,7 +565,7 @@ public class TowerConnector {
 
     private void logWorkflowEvents(int jobID, boolean importWorkflowChildLogs) throws AnsibleTowerException {
         if(!this.logIdForWorkflows.containsKey(jobID)) { this.logIdForWorkflows.put(jobID, 0); }
-        HttpResponse response = makeRequest(GET, "/api/v1/workflow_jobs/"+ jobID +"/workflow_nodes/?id__gt="+this.logIdForWorkflows.get(jobID));
+        HttpResponse response = makeRequest(GET, "/workflow_jobs/"+ jobID +"/workflow_nodes/?id__gt="+this.logIdForWorkflows.get(jobID));
 
         if(response.getStatusLine().getStatusCode() == 200) {
             JSONObject responseObject;
@@ -553,7 +662,7 @@ public class TowerConnector {
 
     private void logInventorySync(int syncID) throws AnsibleTowerException {
         // These are not normal logs, so we don't need to paginate
-        String apiURL = "/api/v1/inventory_updates/"+ syncID +"/";
+        String apiURL = "/inventory_updates/"+ syncID +"/";
         HttpResponse response = makeRequest(GET, apiURL);
         if(response.getStatusLine().getStatusCode() == 200) {
             JSONObject responseObject;
@@ -578,7 +687,7 @@ public class TowerConnector {
 
     private void logProjectSync(int syncID) throws AnsibleTowerException {
         // These are not normal logs, so we don't need to paginate
-        String apiURL = "/api/v1/project_updates/"+ syncID +"/";
+        String apiURL = "/project_updates/"+ syncID +"/";
         HttpResponse response = makeRequest(GET, apiURL);
         if(response.getStatusLine().getStatusCode() == 200) {
             JSONObject responseObject;
@@ -604,7 +713,7 @@ public class TowerConnector {
         if(!this.logIdForJobs.containsKey(jobID)) { this.logIdForJobs.put(jobID, 0); }
         boolean keepChecking = true;
         while(keepChecking) {
-            String apiURL = "/api/v1/jobs/" + jobID + "/job_events/?id__gt="+ this.logIdForJobs.get(jobID);
+            String apiURL = "/jobs/" + jobID + "/job_events/?id__gt="+ this.logIdForJobs.get(jobID);
             HttpResponse response = makeRequest(GET, apiURL);
 
             if (response.getStatusLine().getStatusCode() == 200) {
@@ -641,8 +750,8 @@ public class TowerConnector {
     public boolean isJobFailed(int jobID, String templateType) throws AnsibleTowerException {
         checkTemplateType(templateType);
 
-        String apiEndPoint = "/api/v1/jobs/"+ jobID +"/";
-        if(templateType.equalsIgnoreCase(WORKFLOW_TEMPLATE_TYPE)) { apiEndPoint = "/api/v1/workflow_jobs/"+ jobID +"/"; }
+        String apiEndPoint = "/jobs/"+ jobID +"/";
+        if(templateType.equalsIgnoreCase(WORKFLOW_TEMPLATE_TYPE)) { apiEndPoint = "/workflow_jobs/"+ jobID +"/"; }
         HttpResponse response = makeRequest(GET, apiEndPoint);
 
         if(response.getStatusLine().getStatusCode() == 200) {
@@ -685,7 +794,7 @@ public class TowerConnector {
     private String getAuthToken() throws AnsibleTowerException {
         logger.logMessage("Adding auth for "+ this.username);
 
-        String tokenURI = url + "/api/v1/authtoken/";
+        String tokenURI = url + "/authtoken/";
         HttpPost tokenRequest = new HttpPost(tokenURI);
         tokenRequest.setHeader(HttpHeaders.AUTHORIZATION, this.getBasicAuthString());
         JSONObject body = new JSONObject();
