@@ -168,6 +168,7 @@ public class TowerConnector {
                     this.authToken = getAuthToken();
                 } catch(AnsibleTowerDoesNotSupportAuthtoken dneat) {
                     logger.logMessage("Tower does not support authtoken, reverting to basic auth");
+                    logger.logMessage(dneat.getMessage());
                     this.authToken = "BasicAuth";
                 }
             }
@@ -797,7 +798,7 @@ public class TowerConnector {
     private String getAuthToken() throws AnsibleTowerException {
         logger.logMessage("Adding auth for "+ this.username);
 
-        String tokenURI = url + "/authtoken/";
+        String tokenURI = url + this.buildEndpoint("/authtoken/");
         HttpPost tokenRequest = new HttpPost(tokenURI);
         tokenRequest.setHeader(HttpHeaders.AUTHORIZATION, this.getBasicAuthString());
         JSONObject body = new JSONObject();
@@ -823,7 +824,7 @@ public class TowerConnector {
         if(response.getStatusLine().getStatusCode() == 400) {
             throw new AnsibleTowerException("Username/password invalid");
         } else if(response.getStatusLine().getStatusCode() == 404) {
-            throw new AnsibleTowerDoesNotSupportAuthtoken("");
+            throw new AnsibleTowerDoesNotSupportAuthtoken("Server does not have endpoint: "+ tokenURI);
         } else if(response.getStatusLine().getStatusCode() != 200) {
             throw new AnsibleTowerException("Unable to get auth token, server responded with ("+ response.getStatusLine().getStatusCode() +")");
         }
