@@ -8,6 +8,7 @@ import static com.cloudbees.plugins.credentials.CredentialsMatchers.instanceOf;
 import com.cloudbees.plugins.credentials.common.StandardListBoxModel;
 import com.cloudbees.plugins.credentials.common.UsernamePasswordCredentials;
 import com.cloudbees.plugins.credentials.common.StandardUsernamePasswordCredentials;
+import org.jenkinsci.plugins.plaincredentials.StringCredentials;
 import hudson.Extension;
 import hudson.model.AbstractDescribableImpl;
 import hudson.model.Descriptor;
@@ -54,6 +55,7 @@ public class TowerInstallation extends AbstractDescribableImpl<TowerInstallation
     public static TowerConnector getTowerConnectorStatic(String towerURL, String towerCredentialsId, boolean trustCert, boolean enableDebugging) {
         String username = null;
         String password = null;
+        String oauth_token = null;
         if(StringUtils.isNotBlank(towerCredentialsId)) {
             List<StandardUsernamePasswordCredentials> credsList = CredentialsProvider.lookupCredentials(StandardUsernamePasswordCredentials.class);
             for(StandardUsernamePasswordCredentials creds : credsList) {
@@ -62,8 +64,14 @@ public class TowerInstallation extends AbstractDescribableImpl<TowerInstallation
                     password = creds.getPassword().getPlainText();
                 }
             }
+            List<StringCredentials> secretList = CredentialsProvider.lookupCredentials(StringCredentials.class);
+            for(StringCredentials secret : secretList) {
+                if(secret.getId().equals(towerCredentialsId)) {
+                    oauth_token = secret.getSecret().getPlainText();
+                }
+            }
         }
-        TowerConnector testConnector = new TowerConnector(towerURL, username, password, trustCert, enableDebugging);
+        TowerConnector testConnector = new TowerConnector(towerURL, username, password, oauth_token, trustCert, enableDebugging);
         return testConnector;
     }
 
@@ -90,6 +98,9 @@ public class TowerInstallation extends AbstractDescribableImpl<TowerInstallation
             return new StandardListBoxModel().withEmptySelection().withMatching(
                     instanceOf(UsernamePasswordCredentials.class),
                     CredentialsProvider.lookupCredentials(StandardUsernameCredentials.class, project)
+            ).withMatching(
+                    instanceOf(StringCredentials.class),
+                    CredentialsProvider.lookupCredentials(StringCredentials.class, project)
             );
         }
 

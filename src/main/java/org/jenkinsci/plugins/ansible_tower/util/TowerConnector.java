@@ -53,6 +53,7 @@ public class TowerConnector {
     private String url = null;
     private String username = null;
     private String password = null;
+    private String oauthToken = null;
     private boolean trustAllCerts = true;
     private TowerLogger logger = new TowerLogger();
     HashMap<Integer, Integer> logIdForWorkflows = new HashMap<Integer, Integer>();
@@ -64,11 +65,9 @@ public class TowerConnector {
     private HashMap<String, String> jenkinsExports = new HashMap<String, String>();
 
 
-    public TowerConnector(String url, String username, String password) {
-        this(url, username, password, false, false);
-    }
+    public TowerConnector(String url, String username, String password) { this(url, username, password, null, false, false); }
 
-    public TowerConnector(String url, String username, String password, Boolean trustAllCerts, Boolean debug) {
+    public TowerConnector(String url, String username, String password, String oauthToken, Boolean trustAllCerts, Boolean debug) {
         // Credit to https://stackoverflow.com/questions/7438612/how-to-remove-the-last-character-from-a-string
         if(url != null && url.length() > 0 && url.charAt(url.length() - 1) == '/') {
             url = url.substring(0, (url.length() - 1));
@@ -76,6 +75,7 @@ public class TowerConnector {
         this.url = url;
         this.username = username;
         this.password = password;
+        this.oauthToken = oauthToken;
         this.trustAllCerts = trustAllCerts;
         this.setDebug(debug);
         logger.logMessage("Creating a test connector with "+ username +"@"+ url);
@@ -162,7 +162,10 @@ public class TowerConnector {
         }
 
 
-        if(this.username != null || this.password != null) {
+        if(this.oauthToken != null) {
+            logger.logMessage("Adding oauth token");
+            request.setHeader(HttpHeaders.AUTHORIZATION, "Bearer "+ this.oauthToken);
+        } else if(this.username != null || this.password != null) {
             if(this.authToken == null) {
                 try {
                     this.authToken = getAuthToken();
