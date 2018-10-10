@@ -81,6 +81,10 @@ public class TowerConnector {
         this.setDebug(debug);
         try {
             this.getVersion();
+            if(!this.towerVersion.is_greater_or_equal("3.3.0")) {
+                // Basic auth was introduced with tower 3.3 and does not work with previous versions.
+                this.authToken = "BasicAuth";
+            }
         } catch(AnsibleTowerException ate) {
             logger.logMessage("Failed to get connection to get version; auth errors may ensue "+ ate);
         }

@@ -41,8 +41,7 @@ public class TowerVersion {
         TowerVersion anotherVersion = new TowerVersion(anotherVersionString);
         if(anotherVersion.getMajorVersion() < this.major) { return true; }
         if(anotherVersion.getMinorVersion() < this.minor) { return true; }
-        if(anotherVersion.getPointVersion() < this.point) { return true; }
-        if(anotherVersion.getMajorVersion() == this.major && anotherVersion.getMinorVersion() == this.minor && anotherVersion.getPointVersion() == this.point) { return true; }
+        if(anotherVersion.getMajorVersion() == this.major && anotherVersion.getMinorVersion() == this.minor && anotherVersion.getPointVersion() <= this.point) { return true; }
         return false;
     }
 }
