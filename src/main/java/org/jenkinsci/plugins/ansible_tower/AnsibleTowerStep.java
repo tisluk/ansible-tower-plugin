@@ -23,6 +23,9 @@ import org.kohsuke.stapler.DataBoundSetter;
 
 import javax.annotation.Nonnull;
 import java.io.File;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Properties;
 
 public class AnsibleTowerStep extends AbstractStepImpl {
     private String towerServer              = "";
@@ -173,7 +176,7 @@ public class AnsibleTowerStep extends AbstractStepImpl {
     }
 
 
-    public static final class AnsibleTowerStepExecution extends AbstractSynchronousNonBlockingStepExecution<Void> {
+    public static final class AnsibleTowerStepExecution extends AbstractSynchronousNonBlockingStepExecution<Properties> {
         private static final long serialVersionUID = 1L;
 
         @Inject
@@ -200,7 +203,7 @@ public class AnsibleTowerStep extends AbstractStepImpl {
 
 
         @Override
-        protected Void run() throws Exception {
+        protected Properties run() throws Exception {
             if ((computer == null) || (computer.getNode() == null)) {
                 throw new AbortException("The Ansible Tower build step requires to be launched on a node");
             }
@@ -232,16 +235,16 @@ public class AnsibleTowerStep extends AbstractStepImpl {
             if(step.getTemplateType() != null) { templateType = step.getTemplateType(); }
             boolean importWorkflowChildLogs = false;
             if(step.getImportWorkflowChildLogs() != null) { importWorkflowChildLogs = step.getImportWorkflowChildLogs(); }
-
+            Properties map = new Properties();
             boolean runResult = runner.runJobTemplate(
                     listener.getLogger(), step.getTowerServer(), step.getJobTemplate(), jobType, extraVars,
                     limit, tags, skipTags, inventory, credential, verbose, importTowerLogs, removeColor, envVars,
-                    templateType, importWorkflowChildLogs, ws, run
+                    templateType, importWorkflowChildLogs, ws, run, map
             );
             if(!runResult) {
                 throw new AbortException("Ansible Tower build step failed");
             }
-            return null;
+            return map;
         }
     }
 }
