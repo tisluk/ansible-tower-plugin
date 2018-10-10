@@ -157,6 +157,7 @@ public class AnsibleTower extends Builder {
 		public static final Boolean removeColor				= false;
 		public static final String templateType				= "job";
 		public static final Boolean importWorkflowChildLogs	= false;
+		public static final Boolean throwExceptionWhenFail  = true;
 
         public DescriptorImpl() {
             load();

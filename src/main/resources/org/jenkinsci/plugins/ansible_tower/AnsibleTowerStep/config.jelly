@@ -42,4 +42,7 @@
     <f:entry field="removeColor" title="Remove Color" help="/plugin/ansible-tower/help-remove-color.html">
         <f:checkbox />
     </f:entry>
+    <f:entry field="throwExceptionWhenFail" title="Remove Color" help="/plugin/ansible-tower/help-throwExceptionWhenFail.html">
+        <f:checkbox />
+    </f:entry>
 </j:jelly>
