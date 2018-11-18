@@ -18,6 +18,8 @@ import org.kohsuke.stapler.DataBoundSetter;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Properties;
 
 /**
  * @author Janario Oliveira
@@ -123,11 +125,12 @@ public class AnsibleTower extends Builder {
 		boolean importWorkflowChildLogs = false;
 		if(this.getImportWorkflowChildLogs() != null) { importWorkflowChildLogs = this.getImportWorkflowChildLogs(); }
 
+		// here we just pass a map as we don't case for non pipeline jobs
 		boolean runResult = runner.runJobTemplate(
 				listener.getLogger(), this.getTowerServer(), this.getJobTemplate(), this.getJobType(),this.getExtraVars(),
 				this.getLimit(), this.getJobTags(), this.getSkipJobTags(), this.getInventory(), this.getCredential(),
 				this.verbose, this.importTowerLogs, this.getRemoveColor(), envVars, templateType, importWorkflowChildLogs,
-				build.getWorkspace(), build
+				build.getWorkspace(), build, new Properties()
 		);
 		if(runResult) {
 			build.setResult(Result.SUCCESS);
@@ -154,6 +157,7 @@ public class AnsibleTower extends Builder {
 		public static final Boolean removeColor				= false;
 		public static final String templateType				= "job";
 		public static final Boolean importWorkflowChildLogs	= false;
+		public static final Boolean throwExceptionWhenFail  = true;
 
         public DescriptorImpl() {
             load();
