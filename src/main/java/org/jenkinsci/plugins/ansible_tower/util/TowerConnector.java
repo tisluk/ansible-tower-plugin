@@ -6,6 +6,7 @@ package org.jenkinsci.plugins.ansible_tower.util;
 
 import com.google.common.net.HttpHeaders;
 import net.sf.json.JSONArray;
+import org.apache.http.Header;
 import org.jenkinsci.plugins.ansible_tower.exceptions.AnsibleTowerDoesNotSupportAuthtoken;
 import org.jenkinsci.plugins.ansible_tower.exceptions.AnsibleTowerException;
 
@@ -13,6 +14,7 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URLEncoder;
 import java.nio.charset.Charset;
 import java.security.KeyStore;
@@ -25,6 +27,7 @@ import org.apache.http.HttpResponse;
 import org.apache.http.HttpVersion;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.methods.HttpHead;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.conn.ClientConnectionManager;
 import org.apache.http.conn.scheme.Scheme;
@@ -50,10 +53,10 @@ public class TowerConnector {
     private static String API_VERSION = "v2";
 
     private String authToken = null;
+    private String oauthToken = null;
     private String url = null;
     private String username = null;
     private String password = null;
-    private String oauthToken = null;
     private TowerVersion towerVersion = null;
     private boolean trustAllCerts = true;
     private TowerLogger logger = new TowerLogger();
@@ -81,10 +84,7 @@ public class TowerConnector {
         this.setDebug(debug);
         try {
             this.getVersion();
-            if(!this.towerVersion.is_greater_or_equal("3.3.0")) {
-                // Basic auth was introduced with tower 3.3 and does not work with previous versions.
-                this.authToken = "BasicAuth";
-            }
+            logger.logMessage("Connecting to Tower version: "+ this.towerVersion.getVersion());
         } catch(AnsibleTowerException ate) {
             logger.logMessage("Failed to get connection to get version; auth errors may ensue "+ ate);
         }
@@ -103,7 +103,14 @@ public class TowerConnector {
     public HashMap<String, String> getJenkinsExports() { return jenkinsExports; }
 
     private DefaultHttpClient getHttpClient() throws AnsibleTowerException {
-        if(trustAllCerts) {
+        URI myURI = null;
+        try {
+            myURI = new URI(url);
+        } catch(URISyntaxException urise) {
+            throw new AnsibleTowerException("Unable to prase base url: "+ urise);
+        }
+
+        if(trustAllCerts && myURI.getScheme().equalsIgnoreCase("https")) {
             logger.logMessage("Forcing cert trust");
             TrustingSSLSocketFactory sf;
             try {
@@ -176,43 +183,44 @@ public class TowerConnector {
         }
 
 
+        // If we haven't determined auth yet we need to go get it
         if(!noAuth) {
-            if (this.oauthToken != null) {
-                logger.logMessage("Adding oauth token");
-                request.setHeader(HttpHeaders.AUTHORIZATION, "Bearer " + this.oauthToken);
-            } else if (this.username != null || this.password != null) {
-                if (this.authToken == null) {
-                    try {
-                        this.authToken = getAuthToken();
-                    } catch (AnsibleTowerDoesNotSupportAuthtoken dneat) {
-                        logger.logMessage("Tower does not support authtoken, reverting to basic auth");
-                        logger.logMessage(dneat.getMessage());
-                        this.authToken = "BasicAuth";
-                    }
-                }
+            if (this.oauthToken == null && this.authToken == null && this.username != null && this.password != null) {
+                // We dont' have a token yet so we need to get one
+                logger.logMessage("Performing initial login");
 
-                if (this.authToken != null && !this.authToken.equals("BasicAuth")) {
-                    logger.logMessage("Adding token auth for " + this.username);
-                    if (this.towerVersion != null && (
-                            // This is for actual Tower
-                            this.towerVersion.is_greater_or_equal("3.3.0") || (
-                                    // This is for AWX, too bad if you are running Tower 1.X or AWX v2 (which does not exist yet)
-                                    !this.towerVersion.is_greater_or_equal("2.0.0") &&
-                                            this.towerVersion.is_greater_or_equal("1.0.7")
-                            )
-                    )
-                            ) {
-                        request.setHeader(HttpHeaders.AUTHORIZATION, "Bearer " + this.authToken);
+                // First try to get an authorization header
+                try {
+                    this.authToken = getAuthToken();
+                    // Now that we have an auth token we need to decide if we are using it via Bearer (oAuth) or legacy token
+                    if(this.towerSupportsOAuth()) {
+                        logger.logMessage("Using an oAuth token for "+ this.username);
+                        this.authToken = "Bearer " + this.authToken;
                     } else {
-                        logger.logMessage("Setting legacy Token");
-                        request.setHeader(HttpHeaders.AUTHORIZATION, "Token " + this.authToken);
+                        logger.logMessage("Using a legacy token for "+ this.username);
+                        this.authToken = "Token " + this.authToken;
                     }
-                } else {
-                    logger.logMessage("Adding basic auth for " + this.username);
-                    request.setHeader(HttpHeaders.AUTHORIZATION, this.getBasicAuthString());
+                } catch (AnsibleTowerDoesNotSupportAuthtoken dneat) {
+                    logger.logMessage("Tower does not support authtoken, reverting to basic auth");
+                    logger.logMessage(dneat.getMessage());
+                    this.authToken = this.getBasicAuthString();
                 }
             }
+
+            if (this.oauthToken != null) {
+                // If we were given an oauthToken we will just use that directly
+                logger.logMessage("Adding oauth bearer token from Jenkins");
+                request.setHeader(HttpHeaders.AUTHORIZATION, "Bearer " + this.oauthToken);
+            } else if(this.authToken != null) {
+                logger.logMessage("Adding token pulled from Tower");
+                request.setHeader(HttpHeaders.AUTHORIZATION, this.authToken);
+            } else {
+                throw new AnsibleTowerException("Auth is required for this call but no auth info exists");
+            }
         }
+
+        // Dump the request
+        // logger.logMessage(this.dumpRequest(request));
 
         DefaultHttpClient httpClient = getHttpClient();
         HttpResponse response;
@@ -227,11 +235,72 @@ public class TowerConnector {
             throw new AnsibleTowerItemDoesNotExist("The item does not exist");
         } else if(response.getStatusLine().getStatusCode() == 401) {
             throw new AnsibleTowerException("Username/password invalid");
+        } else if(response.getStatusLine().getStatusCode() == 403) {
+            String exceptionText = "Request was forbidden";
+            JSONObject responseObject = null;
+            String json;
+            try {
+                json = EntityUtils.toString(response.getEntity());
+                logger.logMessage(json);
+                responseObject = JSONObject.fromObject(json);
+                if(responseObject.containsKey("detail")) {
+                    exceptionText+= ": "+ responseObject.getString("detail");
+                }
+            } catch (IOException ioe) {
+                // Ignore if we get an error
+            }
+
+            throw new AnsibleTowerException(exceptionText);
         }
 
         return response;
     }
 
+
+    private String dumpRequest(HttpUriRequest theRequest) {
+        StringBuilder sb = new StringBuilder();
+
+        sb.append("Request Method = [" + theRequest.getMethod() + "], ");
+        sb.append("Request URL Path = [" + theRequest.getURI()+ "], ");
+
+        sb.append("[headers]");
+        for(Header aHeader : theRequest.getAllHeaders()) {
+            sb.append("    "+ aHeader.getName() +": "+ aHeader.getValue());
+        }
+
+        return sb.toString();
+    }
+
+
+    private boolean towerSupportsOAuth() throws AnsibleTowerException {
+        // To determine if we support oAuth we will be making a HEAD call to /api/o to see what happens
+
+        URI myURI;
+        try {
+            myURI = new URI(url+"/api/o/");
+        } catch(Exception e) {
+            throw new AnsibleTowerException("URL issue: "+ e.getMessage());
+        }
+
+        logger.logMessage("Checking for oAuth at: "+ myURI.toString());
+
+        DefaultHttpClient httpClient = getHttpClient();
+        HttpResponse response;
+        try {
+            response = httpClient.execute(new HttpHead(myURI));
+        } catch(Exception e) {
+            throw new AnsibleTowerException("Unable to make Tower HEAD request for oauth: "+ e.getMessage());
+        }
+
+        logger.logMessage("oAuth request completed with ("+ response.getStatusLine().getStatusCode() +")");
+        if(response.getStatusLine().getStatusCode() == 404) {
+            logger.logMessage("Tower does not supoort oAuth");
+            return false;
+        } else {
+            logger.logMessage("Tower supoorts oAuth");
+            return true;
+        }
+    }
 
     public void getVersion() throws AnsibleTowerException {
         // The version is housed on the poing page which is openly accessable
@@ -876,9 +945,10 @@ public class TowerConnector {
         DefaultHttpClient httpClient = getHttpClient();
         HttpResponse response;
         try {
+            logger.logMessage("Calling for token at "+ tokenURI);
             response = httpClient.execute(tokenRequest);
         } catch(Exception e) {
-            throw new AnsibleTowerException("Unable to make tower request for aRequest completed withuthtoken: "+ e.getMessage());
+            throw new AnsibleTowerException("Unable to make request for an authtoken: "+ e.getMessage());
         }
 
         if(response.getStatusLine().getStatusCode() == 400) {
@@ -899,6 +969,7 @@ public class TowerConnector {
         }
 
         if (responseObject.containsKey("token")) {
+            logger.logMessage("AuthToken acquired");
             return responseObject.getString("token");
         }
         logger.logMessage(json);
